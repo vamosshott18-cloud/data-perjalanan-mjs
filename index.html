@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Data Perjalanan MJS</title>
+<meta name="theme-color" content="#1b1e3d">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="ikon-192.png?v=1">
+<link rel="apple-touch-icon" href="ikon-192.png?v=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Perjalanan MJS">
+<style>
+  :root {
+    --bg: #f3f4f8; --kartu: #ffffff; --teks: #15172b; --redup: #676a80; --garis: #e0e2ea;
+    --navy: #1b1e3d; --navy-2: #2c3060; --navy-muda: #eceef7; --merah: #ec151d; --merah-muda: #fdeceb;
+    --putih: #ffffff; --hijau: #1f9d55; --kuning: #f5b400; --r: 14px;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; background: var(--bg); color: var(--teks); font: 15px/1.4 -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+  body { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  input, select, textarea { font: inherit; color: inherit; }
+
+  header { position: sticky; top: 0; z-index: 20; background: var(--navy); color: var(--putih);
+    padding: calc(10px + env(safe-area-inset-top)) 16px 10px; display: flex; align-items: center; gap: 10px; }
+  header .logo { width: 44px; height: 44px; border-radius: 11px; background: var(--putih); display: grid; place-items: center; flex: none; }
+  header .logo img { width: 36px; height: auto; }
+  header h1 { margin: 0; font-size: 17px; line-height: 1.15; }
+  header h1 small { display: block; font-size: 11px; font-weight: normal; opacity: .7; letter-spacing: .3px; }
+  header .kanan { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+  .status { font-size: 11px; padding: 4px 8px; border-radius: 99px; background: var(--navy-2); white-space: nowrap; }
+  .status::before { content: "● "; color: #9aa0c0; }
+  .status.ok::before { color: #4ade80; } .status.antre::before { color: var(--kuning); } .status.galat::before { color: #ff7b6b; }
+  .ikonbtn { background: none; border: 0; color: var(--putih); width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; }
+  .ikonbtn:active { background: var(--navy-2); }
+
+  main { max-width: 640px; margin: 0 auto; padding: 14px 16px 24px; }
+  .layar { display: none; } .layar.aktif { display: block; }
+  .kartu { background: var(--kartu); border-radius: var(--r); padding: 14px; margin-bottom: 12px; border: 1px solid var(--garis); }
+  .label { font-size: 12px; font-weight: 700; color: var(--redup); text-transform: uppercase; letter-spacing: .5px; margin: 0 0 8px; display: flex; align-items: center; gap: 8px; }
+  .label .no { width: 20px; height: 20px; border-radius: 6px; background: var(--navy); color: #fff; display: grid; place-items: center; font-size: 11px; letter-spacing: 0; }
+  .label .isi { margin-left: auto; text-transform: none; letter-spacing: 0; color: var(--teks); font-size: 13px; }
+  .sub { font-size: 12px; font-weight: 700; color: var(--redup); margin: 12px 0 6px; }
+  .sub:first-child { margin-top: 0; }
+  .opsional { font-weight: normal; text-transform: none; letter-spacing: 0; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { border: 1.5px solid var(--garis); background: var(--putih); border-radius: 10px; padding: 9px 12px; min-height: 44px;
+    font-weight: 700; font-size: 14px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+  .chip.pilih { background: var(--navy); color: var(--putih); border-color: var(--navy); }
+  .chip.kecil { min-height: 34px; padding: 5px 10px; font-size: 13px; }
+  .chip.merah.pilih { background: var(--merah); border-color: var(--merah); }
+  .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .baris { display: flex; gap: 8px; align-items: center; }
+  .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; background: var(--navy-muda); border-radius: 11px; padding: 3px; gap: 3px; }
+  .seg button { border: 0; background: none; border-radius: 9px; min-height: 40px; font-weight: 700; font-size: 14px; color: var(--redup); }
+  .seg button.pilih { background: var(--putih); color: var(--navy); box-shadow: 0 1px 3px rgba(20,22,50,.15); }
+  .seg button.pilih.merah { color: var(--merah); }
+
+  input.isian, textarea.isian, select.isian { width: 100%; border: 1.5px solid var(--garis); border-radius: 10px; padding: 10px 12px; background: var(--putih); min-height: 46px; }
+  input.isian:focus, textarea.isian:focus, select.isian:focus { outline: none; border-color: var(--navy); }
+  textarea.isian { min-height: 84px; resize: vertical; }
+  .uang { position: relative; }
+  .uang span { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--redup); font-size: 14px; pointer-events: none; }
+  .uang input { padding-left: 36px; font-weight: 700; }
+  .uang label { display: block; font-size: 12px; font-weight: 700; color: var(--redup); margin-bottom: 4px; position: static; }
+
+  .rute { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; }
+  .rute .titik { display: flex; align-items: center; gap: 8px; }
+  .rute .titik input { flex: 1; min-width: 0; }
+  .rute .titik i { width: 12px; height: 12px; border-radius: 50%; flex: none; }
+  .rute .titik i.a { border: 3px solid var(--navy); } .rute .titik i.b { background: var(--merah); }
+  .tukar { width: 46px; height: 46px; border-radius: 12px; border: 1.5px solid var(--garis); background: var(--putih); font-size: 18px; }
+  .tanggal { display: flex; align-items: center; gap: 8px; }
+  .tanggal button.panah { width: 46px; height: 46px; border-radius: 12px; border: 1.5px solid var(--garis); background: var(--putih); font-size: 18px; flex: none; }
+  .tanggal .teks { flex: 1; text-align: center; border: 1.5px solid var(--garis); border-radius: 12px; min-height: 46px; display: grid; place-items: center; position: relative; background: #fff; font-weight: 700; }
+  .tanggal .teks small { display: block; font-weight: normal; color: var(--redup); font-size: 11px; }
+  .tanggal .teks input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; }
+
+  .saya { display: flex; align-items: center; gap: 10px; }
+  .saya .ava { width: 40px; height: 40px; border-radius: 50%; background: var(--navy); color: #fff; display: grid; place-items: center; font-weight: 700; flex: none; }
+  .saya .nama { font-size: 18px; font-weight: 700; }
+  .saya small { display: block; color: var(--redup); font-size: 12px; }
+  .linkbtn { background: none; border: 0; color: var(--merah); font-weight: 700; padding: 6px 0; margin-left: auto; }
+  .ubah-mode { background: var(--merah-muda); border-color: #f6c3c0; }
+
+  .peringatan { background: #fff7d6; border: 1.5px solid #f3d36b; border-radius: 10px; padding: 10px 12px; font-size: 13px; margin-bottom: 12px; display: flex; gap: 10px; align-items: center; }
+  .peringatan button { margin-left: auto; flex: none; }
+  .ringkas { font-size: 13px; color: var(--redup); margin-bottom: 8px; text-align: center; }
+  .ringkas b { color: var(--teks); }
+
+  .tombol { border: 0; border-radius: 12px; padding: 13px 16px; font-weight: 700; font-size: 16px; min-height: 52px; width: 100%; }
+  .tombol.utama { background: var(--navy); color: var(--putih); }
+  .tombol.merah { background: var(--merah); color: var(--putih); }
+  .tombol.utama:disabled { background: #b9bccb; }
+  .tombol.garis { background: var(--putih); border: 1.5px solid var(--navy); color: var(--navy); }
+  .tombol.bahaya { background: var(--putih); border: 1.5px solid var(--merah); color: var(--merah); }
+  .tombol.kecil { min-height: 42px; padding: 9px 12px; font-size: 14px; width: auto; }
+  .lekat { position: sticky; bottom: calc(72px + env(safe-area-inset-bottom)); padding: 10px 0 4px; background: linear-gradient(rgba(243,244,248,0), var(--bg) 30%); z-index: 5; }
+
+  nav.bawah { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: var(--putih); border-top: 1px solid var(--garis);
+    display: grid; grid-template-columns: repeat(3, 1fr); padding-bottom: env(safe-area-inset-bottom); }
+  nav.bawah button { background: none; border: 0; padding: 9px 0 10px; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 12px; font-weight: 700; color: var(--redup); }
+  nav.bawah button svg { width: 24px; height: 24px; }
+  nav.bawah button.aktif { color: var(--navy); }
+  nav.bawah button.aktif svg { stroke: var(--merah); }
+
+  .bulan { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .bulan b { flex: 1; text-align: center; font-size: 17px; }
+  .bulan button { width: 44px; height: 44px; border-radius: 12px; border: 1.5px solid var(--garis); background: var(--putih); font-size: 18px; }
+  .gulir { display: flex; gap: 8px; overflow-x: auto; margin: 0 -16px 10px; padding: 0 16px 4px; scrollbar-width: none; }
+  .gulir::-webkit-scrollbar { display: none; }
+  .gulir .chip { flex: none; }
+
+  .hari { margin: 16px 0 6px; display: flex; align-items: baseline; gap: 8px; }
+  .hari b { font-size: 14px; } .hari span { font-size: 12px; color: var(--redup); }
+  .item { background: var(--kartu); border: 1px solid var(--garis); border-radius: 12px; padding: 10px 12px; margin-bottom: 6px; display: flex; gap: 10px; align-items: center; width: 100%; text-align: left; }
+  .item .jenis { flex: none; width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; font-size: 12px; font-weight: 800; }
+  .j-Jenazah { background: #e9eaf3; color: var(--navy); }
+  .j-Rujuk { background: var(--merah-muda); color: var(--merah); }
+  .j-Pasien-Kontrol { background: #e6f4ec; color: #17794a; }
+  .j-Pasien-Pulang { background: #fff4d6; color: #96690a; }
+  .item .tengah { flex: 1; min-width: 0; }
+  .item .tengah b { display: block; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .item .tengah span { font-size: 12px; color: var(--redup); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .item .kanan-i { text-align: right; flex: none; font-size: 13px; font-weight: 700; }
+  .item .kanan-i small { display: block; font-weight: normal; color: var(--redup); font-size: 11px; }
+  .item .kanan-i .kosong-n { color: var(--merah); }
+  .item.antre { border-style: dashed; border-color: var(--kuning); }
+  .tanda { display: inline-block; font-size: 10px; font-weight: 800; border-radius: 6px; padding: 1px 5px; margin-left: 4px; vertical-align: 1px; }
+  .tanda.cek { background: #fff1c2; color: #8a6200; } .tanda.komplain { background: var(--merah-muda); color: var(--merah); }
+  .kosong { text-align: center; color: var(--redup); padding: 40px 10px; }
+
+  .angka { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px; }
+  .angka div { background: var(--navy); color: var(--putih); border-radius: 12px; padding: 12px; }
+  .angka div.sisa { background: var(--merah); }
+  .angka b { display: block; font-size: 20px; }
+  .angka span { font-size: 12px; opacity: .75; }
+  table.rekap { width: 100%; border-collapse: collapse; font-size: 14px; }
+  table.rekap th { text-align: left; font-size: 11px; text-transform: uppercase; color: var(--redup); padding: 6px 4px; border-bottom: 1.5px solid var(--garis); }
+  table.rekap td { padding: 8px 4px; border-bottom: 1px solid var(--garis); }
+  table.rekap .n { text-align: right; white-space: nowrap; }
+  table.rekap tr.total td { font-weight: 800; border-bottom: 0; border-top: 1.5px solid var(--navy); }
+  table.rekap tr.min td.n { color: var(--merah); }
+  table.rekap tr.grup td { font-size: 11px; text-transform: uppercase; color: var(--redup); font-weight: 700; padding-top: 12px; border-bottom: 0; }
+  table.rekap td.hapus-b { width: 34px; text-align: right; }
+  table.rekap td.hapus-b button { border: 0; background: none; color: var(--merah); font-size: 16px; width: 30px; height: 30px; }
+  .grafik svg { display: block; width: 100%; height: auto; }
+  .legend { display: flex; gap: 14px; font-size: 12px; color: var(--redup); margin-top: 6px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+  .ekspor { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .ekspor button { display: flex; align-items: center; gap: 10px; text-align: left; padding: 12px; border-radius: 12px; border: 1.5px solid var(--garis); background: var(--putih); min-height: 60px; }
+  .ekspor button b { display: block; font-size: 14px; }
+  .ekspor button span { font-size: 11px; color: var(--redup); }
+  .ekspor .ik { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; font-size: 11px; font-weight: 800; color: #fff; flex: none; }
+  details.lipat > summary { cursor: pointer; list-style: none; }
+  details.lipat > summary::-webkit-details-marker { display: none; }
+  details.lipat > summary::after { content: " ▾"; }
+  details.lipat[open] > summary::after { content: " ▴"; }
+
+  .masuk { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; }
+  .masuk .kotak { width: 100%; max-width: 380px; text-align: center; }
+  .masuk img { width: 220px; max-width: 70%; margin-bottom: 18px; }
+  .masuk h2 { margin: 0 0 4px; } .masuk p { color: var(--redup); margin: 0 0 18px; font-size: 14px; }
+  .masuk input { text-align: center; font-size: 22px; letter-spacing: 6px; margin-bottom: 10px; }
+
+  .lapis { position: fixed; inset: 0; background: rgba(15,17,40,.5); z-index: 50; display: none; align-items: flex-end; justify-content: center; }
+  .lapis.tampil { display: flex; }
+  .lembar { background: var(--bg); width: 100%; max-width: 640px; max-height: 92vh; overflow-y: auto; border-radius: 18px 18px 0 0; padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); }
+  .lembar h2 { margin: 0 0 12px; font-size: 18px; display: flex; align-items: center; }
+  .lembar h2 button { margin-left: auto; }
+  .toast { position: fixed; left: 50%; top: calc(72px + env(safe-area-inset-top)); transform: translateX(-50%) translateY(-20px); opacity: 0; pointer-events: none;
+    background: var(--navy); color: var(--putih); padding: 12px 16px; border-radius: 12px; font-weight: 700; z-index: 60; transition: .2s; max-width: calc(100% - 32px); text-align: center; }
+  .toast.tampil { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .catatan-kecil { font-size: 12px; color: var(--redup); margin-top: 8px; }
+  .kunci { text-align: center; padding: 26px 14px; }
+  .kunci svg { width: 40px; height: 40px; stroke: var(--navy); }
+  @media (max-width: 360px) { .grid-4 { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+
+<div id="layarMasuk" class="masuk" hidden>
+  <div class="kotak">
+    <img src="logo_lengkap.png" alt="CV. Muda Jaya Sembada">
+    <h2>Data Perjalanan</h2>
+    <p>Masukkan PIN dari admin untuk membuka aplikasi.</p>
+    <input id="pinMasuk" class="isian" type="password" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="••••••">
+    <button id="btnMasuk" class="tombol utama">Masuk</button>
+    <p id="pesanMasuk" class="catatan-kecil"></p>
+  </div>
+</div>
+
+<div id="aplikasi" hidden>
+<header>
+  <div class="logo"><img src="logo.png" alt=""></div>
+  <h1>Data Perjalanan<small>CV. Muda Jaya Sembada</small></h1>
+  <div class="kanan">
+    <span id="status" class="status">memuat</span>
+    <button id="btnAtur" class="ikonbtn" aria-label="Pengaturan">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+  </div>
+</header>
+
+<main>
+  <!-- ============ CATAT ============ -->
+  <section id="lCatat" class="layar aktif">
+    <div id="kartuUbah" class="kartu ubah-mode" hidden>
+      <div class="baris"><b id="judulUbah">Mengubah trip</b><button id="batalUbah" class="linkbtn">Batal</button></div>
+      <div id="cekUbah" class="catatan-kecil" hidden></div>
+    </div>
+
+    <div class="kartu">
+      <div class="saya">
+        <div id="avaDriver" class="ava">?</div>
+        <div><small>Driver</small><div id="namaDriver" class="nama">Pilih nama</div></div>
+        <button id="gantiDriver" class="linkbtn">Ganti</button>
+      </div>
+      <div id="pilihDriver" class="chips" style="margin-top:10px" hidden></div>
+    </div>
+
+    <div class="kartu">
+      <p class="label"><span class="no">1</span>Kapan &amp; jenis</p>
+      <div class="tanggal">
+        <button class="panah" id="tglKurang" aria-label="Hari sebelumnya">‹</button>
+        <div class="teks"><div><span id="tglTeks">Hari ini</span><small id="tglSub"></small></div><input id="tglInput" type="date" aria-label="Pilih tanggal"></div>
+        <button class="panah" id="tglTambah" aria-label="Hari berikutnya">›</button>
+      </div>
+      <div id="jenisChips" class="grid-2" style="margin-top:10px"></div>
+    </div>
+
+    <div class="kartu">
+      <p class="label"><span class="no">2</span>Rute</p>
+      <div class="rute">
+        <div>
+          <div class="titik"><i class="a"></i><input id="jemput" class="isian" list="dlTempat" placeholder="Titik jemput" autocomplete="off"></div>
+          <div id="jemputChips" class="chips" style="margin:8px 0 12px 20px"></div>
+          <div class="titik"><i class="b"></i><input id="antar" class="isian" list="dlTempat" placeholder="Titik antar" autocomplete="off"></div>
+          <div id="antarChips" class="chips" style="margin:8px 0 0 20px"></div>
+        </div>
+        <button id="tukar" class="tukar" aria-label="Tukar jemput dan antar" style="align-self:center">⇅</button>
+      </div>
+      <datalist id="dlTempat"></datalist>
+    </div>
+
+    <div class="kartu">
+      <p class="label"><span class="no">3</span>Unit &amp; pembayaran</p>
+      <div id="unitChips" class="chips"></div>
+      <div class="sub">Pembayaran</div>
+      <div id="bayarChips" class="seg"></div>
+      <div id="nilaiWrap" hidden>
+        <div class="sub">Nilai pembayaran <span class="opsional">(admin)</span></div>
+        <div class="uang"><span>Rp</span><input id="nilai" class="isian" inputmode="numeric" placeholder="0" autocomplete="off"></div>
+        <div id="nilaiCepat" class="chips" style="margin-top:8px"></div>
+      </div>
+    </div>
+
+    <div class="kartu">
+      <p class="label"><span class="no">4</span>Biaya jalan <span class="opsional">— kosongkan kalau tidak ada</span></p>
+      <div class="sub">BBM</div>
+      <div class="uang"><span>Rp</span><input id="bbm" class="isian" inputmode="numeric" placeholder="0" autocomplete="off"></div>
+      <div id="bbmCepat" class="chips" style="margin-top:8px"></div>
+      <div class="grid-2" style="margin-top:12px">
+        <div class="uang"><label for="tol">Tol</label><div class="uang"><span>Rp</span><input id="tol" class="isian" inputmode="numeric" placeholder="0" autocomplete="off"></div></div>
+        <div class="uang"><label for="alat">Alat medis</label><div class="uang"><span>Rp</span><input id="alat" class="isian" inputmode="numeric" placeholder="0" autocomplete="off"></div></div>
+      </div>
+      <div style="margin-top:12px" class="uang"><label for="lain">Pengeluaran lain <span class="opsional">(uang makan, roro, parkir…)</span></label>
+        <div class="uang"><span>Rp</span><input id="lain" class="isian" inputmode="numeric" placeholder="0" autocomplete="off"></div></div>
+    </div>
+
+    <div class="kartu">
+      <p class="label"><span class="no">5</span>Komplain &amp; catatan</p>
+      <div id="komplainChips" class="seg"></div>
+      <textarea id="ketKomplain" class="isian" style="margin-top:8px" placeholder="Komplain terkait apa?" hidden></textarea>
+      <textarea id="catatan" class="isian" style="margin-top:8px" placeholder="Catatan (opsional) — mis. uang roro, pulang-pergi, karyawan Awal Bros"></textarea>
+    </div>
+
+    <div id="adminUbah" class="grid-2" style="margin-bottom:12px" hidden>
+      <button id="btnSudahCek" class="tombol garis kecil" style="width:100%">✓ Sudah dicek</button>
+      <button id="btnHapus" class="tombol bahaya kecil" style="width:100%">Hapus trip</button>
+    </div>
+
+    <div class="lekat">
+      <div id="ringkas" class="ringkas"></div>
+      <button id="simpan" class="tombol utama">Simpan trip</button>
+    </div>
+  </section>
+
+  <!-- ============ DATA ============ -->
+  <section id="lData" class="layar">
+    <div class="bulan"><button id="bKurang" aria-label="Bulan sebelumnya">‹</button><b id="bTeks"></b><button id="bTambah" aria-label="Bulan berikutnya">›</button></div>
+    <div id="filterData" class="gulir"></div>
+    <input id="cari" class="isian" type="search" placeholder="Cari tempat, unit, catatan…" style="margin-bottom:10px">
+    <div id="infoData"></div>
+    <div id="daftarTrip"></div>
+  </section>
+
+  <!-- ============ REKAP ============ -->
+  <section id="lRekap" class="layar">
+    <div id="rekapKunci" class="kartu kunci" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      <h3 style="margin:8px 0 4px">Rekap khusus admin</h3>
+      <p class="catatan-kecil" style="margin:0 0 12px">Masukkan PIN admin untuk melihat pemasukan, biaya bulanan &amp; sisa.</p>
+      <input id="pinAdminRekap" class="isian" type="password" inputmode="numeric" maxlength="8" placeholder="PIN admin" style="text-align:center;margin-bottom:8px">
+      <button id="btnAdminRekap" class="tombol utama">Buka rekap</button>
+    </div>
+    <div id="rekapIsi" hidden>
+      <div class="bulan"><button id="rKurang" aria-label="Bulan sebelumnya">‹</button><b id="rTeks"></b><button id="rTambah" aria-label="Bulan berikutnya">›</button></div>
+      <div id="angkaRekap" class="angka"></div>
+      <div id="peringRekap"></div>
+
+      <div class="kartu">
+        <p class="label">Perhitungan bulan ini</p>
+        <table id="tabelHitung" class="rekap"></table>
+      </div>
+
+      <div class="kartu">
+        <p class="label">Biaya bulanan <span class="opsional">— gaji driver, setoran rujuk, DLL</span></p>
+        <table id="tabelBiaya" class="rekap" style="margin-bottom:10px"></table>
+        <div id="biayaJenis" class="chips" style="margin-bottom:8px"></div>
+        <div class="grid-2">
+          <input id="biayaKet" class="isian" placeholder="Keterangan">
+          <div class="uang"><span>Rp</span><input id="biayaNilai" class="isian" inputmode="numeric" placeholder="0"></div>
+        </div>
+        <button id="biayaSimpan" class="tombol garis kecil" style="width:100%;margin-top:8px">+ Tambah biaya</button>
+      </div>
+
+      <div class="kartu">
+        <p class="label">6 bulan terakhir</p>
+        <div id="grafik" class="grafik"></div>
+        <div class="legend"><span><i style="background:#1b1e3d"></i>Pemasukan</span><span><i style="background:#ec151d"></i>Sisa</span></div>
+      </div>
+
+      <div class="kartu">
+        <details class="lipat"><summary class="label" style="margin:0">Rincian per jenis, pembayaran, unit &amp; driver</summary>
+          <div id="tabelPer" style="margin-top:10px"></div>
+        </details>
+      </div>
+
+      <div class="kartu">
+        <p class="label">Ekspor laporan</p>
+        <div class="ekspor">
+          <button id="ePdf"><span class="ik" style="background:#ec151d">PDF</span><div><b>PDF</b><span>Laporan bulan ini</span></div></button>
+          <button id="eXlsx"><span class="ik" style="background:#1f7a45">XLS</span><div><b>Excel</b><span>Rincian + rekap</span></div></button>
+          <button id="eWa"><span class="ik" style="background:#25a35a">WA</span><div><b>WhatsApp</b><span>Ringkasan teks</span></div></button>
+          <button id="eSheet"><span class="ik" style="background:#1b1e3d">GS</span><div><b>Google Sheet</b><span>Buka data asli</span></div></button>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<nav class="bawah">
+  <button data-layar="lCatat" class="aktif"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Catat</button>
+  <button data-layar="lData"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>Data</button>
+  <button data-layar="lRekap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>Rekap</button>
+</nav>
+</div>
+
+<!-- ============ PENGATURAN ============ -->
+<div id="lapisAtur" class="lapis">
+  <div class="lembar">
+    <h2>Pengaturan <button id="tutupAtur" class="tombol garis kecil">Tutup</button></h2>
+    <div class="kartu">
+      <p class="label">Akses</p>
+      <div id="infoAkses" class="catatan-kecil" style="margin:0 0 10px"></div>
+      <div id="formAdmin" class="baris">
+        <input id="pinAdmin" class="isian" type="password" inputmode="numeric" maxlength="8" placeholder="PIN admin">
+        <button id="btnAdmin" class="tombol utama kecil">Masuk admin</button>
+      </div>
+      <button id="btnKeluarAdmin" class="tombol garis kecil" style="width:100%" hidden>Keluar dari mode admin</button>
+    </div>
+
+    <div id="aturAdmin" hidden>
+      <div class="kartu">
+        <p class="label">Daftar pilihan <span class="opsional">— satu per baris</span></p>
+        <div class="sub">Driver</div><textarea id="dDriver" class="isian"></textarea>
+        <div class="sub">Unit</div><textarea id="dUnit" class="isian"></textarea>
+        <div class="sub">Tempat langganan (muncul sebagai tombol cepat)</div><textarea id="dTempat" class="isian"></textarea>
+        <button id="simpanDaftar" class="tombol garis kecil" style="width:100%;margin-top:8px">Simpan daftar</button>
+      </div>
+      <div class="kartu">
+        <p class="label">Ganti PIN</p>
+        <div class="baris" style="margin-bottom:8px"><input id="pinTimBaru" class="isian" inputmode="numeric" maxlength="8" placeholder="PIN tim baru (6–8 angka)"><button id="btnPinTim" class="tombol garis kecil">Ganti</button></div>
+        <div class="baris"><input id="pinAdminBaru" class="isian" inputmode="numeric" maxlength="8" placeholder="PIN admin baru (6–8 angka)"><button id="btnPinAdmin" class="tombol garis kecil">Ganti</button></div>
+      </div>
+      <div class="kartu">
+        <p class="label">Impor data lama</p>
+        <p class="catatan-kecil" style="margin:0 0 8px">Pilih file <b>data_lama.json</b> (hasil rapikan sheet DATA PERJALANAN). Trip yang sudah ada tidak dobel.</p>
+        <input id="fileImpor" type="file" accept=".json,application/json" class="isian">
+        <div id="infoImpor" class="catatan-kecil"></div>
+      </div>
+    </div>
+
+    <div class="kartu">
+      <p class="label">Perangkat ini</p>
+      <button id="btnSegarkan" class="tombol garis kecil" style="width:100%;margin-bottom:8px">Muat ulang data</button>
+      <button id="btnKeluar" class="tombol bahaya kecil" style="width:100%">Keluar (hapus PIN dari HP ini)</button>
+      <p class="catatan-kecil" id="versi"></p>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="config.js?v=1"></script>
+<script src="api.js?v=1"></script>
+<script src="ekspor.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
