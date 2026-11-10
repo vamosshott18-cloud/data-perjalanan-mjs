@@ -1,5 +1,5 @@
 // Data Perjalanan — CV. Muda Jaya Sembada. Layar: Catat (driver isi trip), Data (daftar per bulan), Rekap (admin).
-const VERSI = "3";
+const VERSI = "4";
 const $ = s => document.querySelector(s);
 const JENIS = ["Jenazah", "Pasien Kontrol", "Pasien Pulang", "Rujuk"];
 const SINGKAT = { "Jenazah": "JNZ", "Pasien Kontrol": "KTR", "Pasien Pulang": "PLG", "Rujuk": "RJK" };
