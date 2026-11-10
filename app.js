@@ -1,5 +1,5 @@
 // Data Perjalanan — CV. Muda Jaya Sembada. Layar: Catat (driver isi trip), Data (daftar per bulan), Rekap (admin).
-const VERSI = "1";
+const VERSI = "2";
 const $ = s => document.querySelector(s);
 const JENIS = ["Jenazah", "Pasien Kontrol", "Pasien Pulang", "Rujuk"];
 const SINGKAT = { "Jenazah": "JNZ", "Pasien Kontrol": "KTR", "Pasien Pulang": "PLG", "Rujuk": "RJK" };
@@ -10,7 +10,7 @@ const HARI = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
 
 const S = { rows: [], biaya: [], daftar: { driver: [], unit: [], tempat: [] }, akses: false, sheetUrl: "" };
 const F = { tanggal: "", jenis: "", unit: "", bayar: "CASH", komplain: "TIDAK" };
-let ubahId = null, bulanAktif = "", filterAktif = "semua", biayaJenis = "Gaji", balik = null;
+let langkah = 1, ubahId = null, bulanAktif = "", filterAktif = "semua", biayaJenis = "Gaji", balik = null;
 
 // ---------- bantu ----------
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -111,7 +111,7 @@ function keLayar(id) {
 function gambarSemua() { gambarForm(); gambarData(); gambarRekap(); gambarAtur(); }
 
 // ---------- CATAT ----------
-function sering(kolom, n = 6) {
+function sering(kolom, n = 4) {
   const hit = {};
   S.rows.forEach(r => { const v = (r[kolom] || "").trim(); if (v) hit[v] = (hit[v] || 0) + 1; });
   const urut = Object.keys(hit).sort((a, b) => hit[b] - hit[a]);
@@ -130,10 +130,10 @@ function gambarForm() {
   $("#tglTeks").textContent = t === h ? "Hari ini" : t === geser(h, -1) ? "Kemarin" : tglPanjang(t);
   $("#tglSub").textContent = t === h || t === geser(h, -1) ? tglPanjang(t) : "";
   $("#tglInput").value = t;
-  chips($("#jenisChips"), JENIS, F.jenis, v => { F.jenis = v; gambarForm(); });
+  chips($("#jenisChips"), JENIS, F.jenis, v => { F.jenis = v; gambarForm(); if (lengkap(1)) setTimeout(() => keLangkah(2), 200); });
 
-  chips($("#jemputChips"), sering("jemput"), $("#jemput").value, v => { $("#jemput").value = v; gambarForm(); }, "chip kecil");
-  chips($("#antarChips"), sering("antar"), $("#antar").value, v => { $("#antar").value = v; gambarForm(); }, "chip kecil");
+  chips($("#jemputChips"), sering("jemput"), $("#jemput").value, v => { $("#jemput").value = v; gambarForm(); if (lengkap(2)) setTimeout(() => keLangkah(3), 200); else $("#antar").focus(); }, "chip kecil");
+  chips($("#antarChips"), sering("antar"), $("#antar").value, v => { $("#antar").value = v; gambarForm(); if (lengkap(2)) setTimeout(() => keLangkah(3), 200); }, "chip kecil");
   const semuaTempat = [...new Set([...(S.daftar.tempat || []), ...S.rows.flatMap(r => [r.jemput, r.antar])].filter(Boolean))].sort();
   $("#dlTempat").innerHTML = semuaTempat.map(v => `<option value="${esc(v)}">`).join("");
 
@@ -159,6 +159,7 @@ function gambarForm() {
   $("#adminUbah").hidden = !(ubahId && S.akses);
   $("#simpan").textContent = ubahId ? "Simpan perubahan" : "Simpan trip";
   ringkas();
+  gambarLangkah();
 }
 function ringkas() {
   const j = $("#jemput").value.trim(), a = $("#antar").value.trim();
@@ -170,12 +171,61 @@ function ringkas() {
     $("#btnBalik").onclick = () => {
       $("#jemput").value = balik.antar; $("#antar").value = balik.jemput;
       if (balik.jenis === "Pasien Kontrol") F.jenis = "Pasien Pulang";
-      balik = null; gambarForm();
+      balik = null; gambarForm(); if (lengkap(1) && lengkap(2)) keLangkah(3);
     };
-  } else if (kurang.length) el.innerHTML = `Belum diisi: <b>${kurang.join(", ")}</b>`;
+  } else if (langkah < 5 && !lengkap(langkah)) el.innerHTML = ["", lsBaca("mj_driver", "") ? "Ketuk jenis trip — langsung lanjut ke rute" : "Pilih nama driver dulu",
+      "Isi titik jemput & antar", "Pilih unit & pembayaran"][langkah];
+  else if (langkah < 3) el.innerHTML = "";
+  else if (kurang.length) el.innerHTML = `Belum diisi: <b>${kurang.join(", ")}</b>`;
   else el.innerHTML = `<b>${esc(F.jenis)}</b> · ${esc(j)} → ${esc(a)} · ${esc(F.unit)}${biaya ? ` · biaya ${rp(biaya)}` : ""}`;
   $("#simpan").disabled = kurang.length > 0;
+  const btnLanjut = $("#lanjut");
+  btnLanjut.disabled = !lengkap(langkah);
+  btnLanjut.textContent = langkah === 4 && !biaya ? "Tidak ada biaya ›" : "Lanjut ›";
+  if (langkah === 5) gambarRingkasan();
 }
+// ---------- langkah 1–5: selesaikan satu langkah dulu, baru pindah ----------
+const NAMA_LANGKAH = ["Jenis", "Rute", "Unit", "Biaya", "Simpan"];
+function lengkap(n) {
+  if (n === 1) return !!lsBaca("mj_driver", "") && !!F.jenis;
+  if (n === 2) return !!$("#jemput").value.trim() && !!$("#antar").value.trim();
+  if (n === 3) return !!F.unit && !!F.bayar;
+  return true;
+}
+const bolehKe = n => Array.from({ length: n - 1 }, (_, i) => i + 1).every(lengkap);
+function keLangkah(n) {
+  n = Math.max(1, Math.min(5, n));
+  if (n > langkah && !bolehKe(n)) {
+    const kurang = Array.from({ length: n - 1 }, (_, i) => i + 1).find(i => !lengkap(i));
+    toast(kurang === 1 ? (lsBaca("mj_driver", "") ? "Pilih jenis trip dulu" : "Pilih nama driver dulu") : kurang === 2 ? "Isi titik jemput & antar dulu" : "Pilih unit dulu");
+    return;
+  }
+  langkah = n; gambarLangkah(); ringkas();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+  if (n === 2 && !$("#jemput").value) setTimeout(() => $("#jemput").focus(), 250);
+}
+function gambarLangkah() {
+  document.querySelectorAll("#lCatat .langkah").forEach(el => el.classList.toggle("aktif", Number(el.dataset.l) === langkah));
+  $("#progres").innerHTML = NAMA_LANGKAH.map((t, i) => {
+    const n = i + 1, kls = n === langkah ? "aktif" : (n < langkah || (ubahId && lengkap(n))) ? "selesai" : "";
+    return `<button type="button" class="${kls}" data-n="${n}" ${n !== langkah && !bolehKe(n) ? "disabled" : ""}><i></i>${n}. ${t}</button>`;
+  }).join("");
+  $("#progres").querySelectorAll("button").forEach(b => b.onclick = () => keLangkah(Number(b.dataset.n)));
+  $("#kembali").hidden = langkah === 1;
+  $("#lanjut").hidden = langkah === 5;
+  $("#simpan").hidden = langkah !== 5;
+}
+function gambarRingkasan() {
+  const r = bacaForm(), biaya = [["BBM", r.bbm], ["Tol", r.tol], ["Alat medis", r.alat], ["Lain", r.lain]].filter(x => x[1]);
+  const baris = (t, v, n) => `<div class="rs-baris"><span>${t}</span><b>${v}${n ? `<button type="button" data-n="${n}">ubah</button>` : ""}</b></div>`;
+  $("#ringkasan5").innerHTML = `<p class="label">Cek sebelum simpan</p>` +
+    baris("Driver", esc(r.driver), 1) + baris("Tanggal", tglPanjang(r.tanggal), 1) + baris("Jenis", esc(r.jenis), 1) +
+    baris("Rute", `${esc(r.jemput)} → ${esc(r.antar)}`, 2) + baris("Unit", `${esc(r.unit)} · ${esc(r.bayar)}`, 3) +
+    (S.akses ? baris("Nilai", nilaiUang("#nilai") ? rp(nilaiUang("#nilai")) : "belum diisi", 3) : "") +
+    baris("Biaya jalan", biaya.length ? biaya.map(([t, n]) => `${t} ${rp(n)}`).join(" · ") : "tidak ada", 4);
+  $("#ringkasan5").querySelectorAll("button").forEach(b => b.onclick = () => keLangkah(Number(b.dataset.n)));
+}
+
 function bacaForm() {
   return {
     tanggal: F.tanggal, jenis: F.jenis, jemput: $("#jemput").value.trim(), antar: $("#antar").value.trim(),
@@ -203,7 +253,7 @@ async function simpan() {
       if (j.antre) { toast("Tersimpan di HP — dikirim otomatis saat ada sinyal"); statusDariAntrean(); }
       else { pakai(j); toast("Trip tersimpan ✓"); statusDariAntrean(true); }
       balik = { jemput: row.jemput, antar: row.antar, jenis: row.jenis };
-      const tgl = F.tanggal; kosongkanForm(); F.tanggal = tgl; gambarForm(); window.scrollTo({ top: 0, behavior: "smooth" });
+      const tgl = F.tanggal; kosongkanForm(); F.tanggal = tgl; langkah = 1; gambarForm(); window.scrollTo({ top: 0, behavior: "smooth" });
     }
   } catch (e) { toast(e.kode === "pin_salah" ? "Butuh PIN admin" : "Gagal: " + e.message); }
   tombol.disabled = false; ringkas(); $("#simpan").textContent = ubahId ? "Simpan perubahan" : "Simpan trip";
@@ -218,7 +268,7 @@ function bukaUbah(r) {
   $("#cekUbah").hidden = !(S.akses && r.perluCek); $("#cekUbah").textContent = r.perluCek ? "⚠ Perlu dicek: " + r.perluCek : "";
   $("#btnSudahCek").hidden = !r.perluCek;
   if (r.driver && r.driver !== lsBaca("mj_driver", "")) $("#namaDriver").textContent = r.driver;
-  keLayar("lCatat"); gambarForm();
+  langkah = 1; keLayar("lCatat"); gambarForm();
   if (r.driver) { $("#namaDriver").textContent = r.driver; }
 }
 
@@ -399,7 +449,9 @@ function pasang() {
   ["#jemput", "#antar"].forEach(id => { $(id).addEventListener("input", ringkas); $(id).addEventListener("change", gambarForm); });
   ["#nilai", "#bbm", "#tol", "#alat", "#lain", "#biayaNilai"].forEach(id => uangInput($(id)));
   $("#simpan").onclick = simpan;
-  $("#batalUbah").onclick = () => { kosongkanForm(); F.tanggal = hariIni(); gambarForm(); keLayar("lData"); };
+  $("#lanjut").onclick = () => keLangkah(langkah + 1);
+  $("#kembali").onclick = () => keLangkah(langkah - 1);
+  $("#batalUbah").onclick = () => { kosongkanForm(); F.tanggal = hariIni(); langkah = 1; gambarForm(); keLayar("lData"); };
   $("#btnHapus").onclick = async () => {
     if (!confirm("Hapus trip ini? Tidak bisa dibatalkan.")) return;
     try { pakai(await API.hapus(ubahId)); toast("Trip dihapus"); kosongkanForm(); gambarForm(); keLayar("lData"); } catch (e) { toast("Gagal: " + e.message); }

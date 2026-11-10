@@ -179,6 +179,26 @@
   .catatan-kecil { font-size: 12px; color: var(--redup); margin-top: 8px; }
   .kunci { text-align: center; padding: 26px 14px; }
   .kunci svg { width: 40px; height: 40px; stroke: var(--navy); }
+  /* langkah 1–5: satu langkah tampil, sisanya menunggu */
+  .langkah { display: none; }
+  .langkah.aktif { display: block; }
+  .grid-2.langkah.aktif { display: grid; }
+  .progres { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 12px; }
+  .progres button { border: 0; background: none; padding: 0; text-align: left; font-size: 11px; font-weight: 700; color: var(--redup); }
+  .progres button i { display: block; height: 5px; border-radius: 3px; background: var(--garis); margin-bottom: 5px; }
+  .progres button.selesai i { background: var(--navy); }
+  .progres button.aktif i { background: var(--merah); }
+  .progres button.aktif { color: var(--merah); }
+  .progres button.selesai { color: var(--navy); }
+  .progres button:disabled { cursor: default; }
+  .navlangkah { display: flex; gap: 8px; }
+  .navlangkah .tombol { flex: 1; }
+  .navlangkah #kembali { flex: 0 0 34%; }
+  .rs-baris { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--garis); font-size: 14px; }
+  .rs-baris:last-child { border-bottom: 0; }
+  .rs-baris span { color: var(--redup); flex: none; }
+  .rs-baris b { text-align: right; }
+  .rs-baris button { border: 0; background: none; color: var(--merah); font-weight: 700; font-size: 12px; padding: 0 0 0 8px; }
   @media (max-width: 360px) { .grid-4 { grid-template-columns: repeat(2, 1fr); } }
 </style>
 </head>
@@ -215,7 +235,9 @@
       <div id="cekUbah" class="catatan-kecil" hidden></div>
     </div>
 
-    <div class="kartu">
+    <div id="progres" class="progres"></div>
+
+    <div class="kartu langkah" data-l="1">
       <div class="saya">
         <div id="avaDriver" class="ava">?</div>
         <div><small>Driver</small><div id="namaDriver" class="nama">Pilih nama</div></div>
@@ -224,7 +246,7 @@
       <div id="pilihDriver" class="chips" style="margin-top:10px" hidden></div>
     </div>
 
-    <div class="kartu">
+    <div class="kartu langkah" data-l="1">
       <p class="label"><span class="no">1</span>Kapan &amp; jenis</p>
       <div class="tanggal">
         <button class="panah" id="tglKurang" aria-label="Hari sebelumnya">‹</button>
@@ -234,7 +256,7 @@
       <div id="jenisChips" class="grid-2" style="margin-top:10px"></div>
     </div>
 
-    <div class="kartu">
+    <div class="kartu langkah" data-l="2">
       <p class="label"><span class="no">2</span>Rute</p>
       <div class="rute">
         <div>
@@ -248,7 +270,7 @@
       <datalist id="dlTempat"></datalist>
     </div>
 
-    <div class="kartu">
+    <div class="kartu langkah" data-l="3">
       <p class="label"><span class="no">3</span>Unit &amp; pembayaran</p>
       <div id="unitChips" class="chips"></div>
       <div class="sub">Pembayaran</div>
@@ -260,7 +282,7 @@
       </div>
     </div>
 
-    <div class="kartu">
+    <div class="kartu langkah" data-l="4">
       <p class="label"><span class="no">4</span>Biaya jalan <span class="opsional">— kosongkan kalau tidak ada</span></p>
       <div class="sub">BBM</div>
       <div class="uang"><span>Rp</span><input id="bbm" class="isian" inputmode="numeric" placeholder="0" autocomplete="off"></div>
@@ -273,21 +295,27 @@
         <div class="uang"><span>Rp</span><input id="lain" class="isian" inputmode="numeric" placeholder="0" autocomplete="off"></div></div>
     </div>
 
-    <div class="kartu">
+    <div class="kartu langkah" data-l="5">
       <p class="label"><span class="no">5</span>Komplain &amp; catatan</p>
       <div id="komplainChips" class="seg"></div>
       <textarea id="ketKomplain" class="isian" style="margin-top:8px" placeholder="Komplain terkait apa?" hidden></textarea>
       <textarea id="catatan" class="isian" style="margin-top:8px" placeholder="Catatan (opsional) — mis. uang roro, pulang-pergi, karyawan Awal Bros"></textarea>
     </div>
 
-    <div id="adminUbah" class="grid-2" style="margin-bottom:12px" hidden>
+    <div id="ringkasan5" class="kartu langkah" data-l="5"></div>
+
+    <div id="adminUbah" class="grid-2 langkah" data-l="5" style="margin-bottom:12px" hidden>
       <button id="btnSudahCek" class="tombol garis kecil" style="width:100%">✓ Sudah dicek</button>
       <button id="btnHapus" class="tombol bahaya kecil" style="width:100%">Hapus trip</button>
     </div>
 
     <div class="lekat">
       <div id="ringkas" class="ringkas"></div>
-      <button id="simpan" class="tombol utama">Simpan trip</button>
+      <div class="navlangkah">
+        <button id="kembali" class="tombol garis">‹ Kembali</button>
+        <button id="lanjut" class="tombol utama">Lanjut ›</button>
+        <button id="simpan" class="tombol merah">Simpan trip</button>
+      </div>
     </div>
   </section>
 
@@ -408,9 +436,9 @@
 
 <div id="toast" class="toast"></div>
 
-<script src="config.js?v=1"></script>
-<script src="api.js?v=1"></script>
-<script src="ekspor.js?v=1"></script>
-<script src="app.js?v=1"></script>
+<script src="config.js?v=2"></script>
+<script src="api.js?v=2"></script>
+<script src="ekspor.js?v=2"></script>
+<script src="app.js?v=2"></script>
 </body>
 </html>
