@@ -137,7 +137,7 @@
   .item .kanan-i .kosong-n { color: var(--merah); }
   .item.antre { border-style: dashed; border-color: var(--kuning); }
   .tanda { display: inline-block; font-size: 10px; font-weight: 800; border-radius: 6px; padding: 1px 5px; margin-left: 4px; vertical-align: 1px; }
-  .tanda.cek { background: #fff1c2; color: #8a6200; } .tanda.komplain { background: var(--merah-muda); color: var(--merah); }
+  .tanda.cek { background: #fff1c2; color: #8a6200; } .tanda.tunggu { background: #ffe9b3; color: #8a5a00; } .tanda.ok { background: #e6f4ec; color: #17794a; } .tanda.komplain { background: var(--merah-muda); color: var(--merah); }
   .kosong { text-align: center; color: var(--redup); padding: 40px 10px; }
 
   .angka { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px; }
@@ -259,6 +259,7 @@
     <div id="kartuUbah" class="kartu ubah-mode" hidden>
       <div class="baris"><b id="judulUbah">Mengubah trip</b><button id="batalUbah" class="linkbtn">Batal</button></div>
       <div id="cekUbah" class="catatan-kecil" hidden></div>
+      <button id="btnKonfirmasi" class="tombol merah kecil" style="width:100%;margin-top:10px" hidden>✓ Konfirmasi booking</button>
     </div>
 
     <div id="progres" class="progres"></div>
@@ -442,6 +443,23 @@
         <button id="simpanDaftar" class="tombol garis kecil" style="width:100%;margin-top:8px">Simpan daftar</button>
       </div>
       <div class="kartu">
+        <p class="label">Notifikasi WhatsApp booking baru</p>
+        <p class="catatan-kecil" style="margin:0 0 10px">Setiap trip baru (dari driver atau admin) otomatis dikirim ke nomor admin di bawah, berisi detail booking + link untuk konfirmasi.</p>
+        <div id="waAktif" class="seg" style="margin-bottom:10px"></div>
+        <div class="sub">Pengirim</div>
+        <div id="waProvider" class="seg"></div>
+        <p id="waBantu" class="catatan-kecil"></p>
+        <div id="waTokenWrap"><div class="sub">Token Fonnte</div>
+          <input id="waToken" class="isian" type="password" autocomplete="off"></div>
+        <div class="sub">Nomor admin tujuan <span class="opsional">— satu per baris</span></div>
+        <textarea id="waTujuan" class="isian" style="min-height:70px"></textarea>
+        <div class="grid-2" style="margin-top:8px">
+          <button id="waSimpan" class="tombol utama kecil" style="width:100%">Simpan</button>
+          <button id="waTes" class="tombol garis kecil" style="width:100%">Kirim tes</button>
+        </div>
+        <p id="waHasil" class="catatan-kecil"></p>
+      </div>
+      <div class="kartu">
         <p class="label">Ganti PIN</p>
         <div class="baris" style="margin-bottom:8px"><input id="pinTimBaru" class="isian" inputmode="numeric" maxlength="8" placeholder="PIN tim baru (6–8 angka)"><button id="btnPinTim" class="tombol garis kecil">Ganti</button></div>
         <div class="baris"><input id="pinAdminBaru" class="isian" inputmode="numeric" maxlength="8" placeholder="PIN admin baru (6–8 angka)"><button id="btnPinAdmin" class="tombol garis kecil">Ganti</button></div>
@@ -465,9 +483,9 @@
 
 <div id="toast" class="toast"></div>
 
-<script src="config.js?v=6"></script>
-<script src="api.js?v=6"></script>
-<script src="ekspor.js?v=6"></script>
-<script src="app.js?v=6"></script>
+<script src="config.js?v=7"></script>
+<script src="api.js?v=7"></script>
+<script src="ekspor.js?v=7"></script>
+<script src="app.js?v=7"></script>
 </body>
 </html>

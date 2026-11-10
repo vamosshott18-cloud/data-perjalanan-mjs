@@ -1,6 +1,6 @@
 // Service worker: aplikasi bisa dipasang ke layar utama & tetap terbuka saat sinyal hilang.
 // Selalu ambil versi terbaru dari internet (lewati cache browser); cache hanya dipakai saat offline.
-const CACHE = "mjs-perjalanan-v6";
+const CACHE = "mjs-perjalanan-v7";
 const FILE = ["./", "index.html", "app.js", "api.js", "ekspor.js", "config.js", "manifest.webmanifest", "ikon-192.png", "ikon-512.png", "logo.png"];
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILE.map(f => new Request(f, { cache: "reload" })))));

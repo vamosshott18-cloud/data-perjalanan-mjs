@@ -8,7 +8,8 @@ const API = (() => {
     unit: ["APV", "Grandmax", "Innova", "Mobil Jenazah"],
     tempat: ["RS Awal Bros", "RS Awal Bros Yasmin", "RSUD", "RS Awal Bros Panam Pekanbaru", "RS Awal Bros Sudirman Pekanbaru", "Bumi Ayu"],
   };
-  const ADMIN_SAJA = ["nilai", "perluCek"];
+  const ADMIN_SAJA = ["nilai", "perluCek", "waInfo"];                          // disembunyikan dari driver
+  const ADMIN_TULIS = ["nilai", "perluCek", "waInfo", "status", "dikonfirmasi"]; // hanya admin yang boleh mengubah
   const baca = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (_) { return d; } };
   const tulis = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} };
   const salin = o => JSON.parse(JSON.stringify(o));
@@ -31,6 +32,15 @@ const API = (() => {
     if (q.aksi === "devKontak") tulis("mj_coba_kontak", String(q.kontak || "").replace(/[^0-9]/g, ""));
     return { ok: true, langganan: langgananCoba(), hariIni: hariIni(), jumlahTrip: baca("mj_coba_trip", []).length, sheetUrl: "" };
   }
+  // mode coba: pesan WA tidak benar-benar dikirim, hanya disimpan di mj_coba_wa_log
+  function waCoba(r, admin, teks) {
+    const w = baca("mj_coba_wa", { aktif: false, tujuan: "" });
+    if (!w.aktif) return { ok: false, mati: true, pesan: "notifikasi WA belum diaktifkan" };
+    if (!w.tujuan.trim()) return { ok: false, pesan: "nomor tujuan belum diisi" };
+    const pesan = teks || `🚑 BOOKING BARU${admin ? " (admin)" : " — perlu konfirmasi"}\n${r.jenis} · ${r.tanggal}\n${r.jemput} → ${r.antar}\n${r.unit} · ${r.driver}`;
+    tulis("mj_coba_wa_log", [...baca("mj_coba_wa_log", []), { ke: w.tujuan, pesan, waktu: new Date().toISOString() }].slice(-20));
+    return { ok: true, pesan: "simulasi: tidak benar-benar dikirim (mode coba)" };
+  }
   function layananCoba(q) {
     if (String(q.aksi).startsWith("dev")) return devCoba(q);
     const lgc = langgananCoba();
@@ -38,28 +48,46 @@ const API = (() => {
     const pinAdmin = baca("mj_coba_pin", "123456"), pinTim = baca("mj_coba_pin_tim", "111111");
     const admin = q.pin === pinAdmin, tim = admin || q.pinTim === pinTim || q.pinTim === pinAdmin;
     if (!tim) return { galat: "pin_tim" };
-    if (["hapus", "daftar", "gantiPin", "gantiPinTim", "biayaTambah", "biayaHapus"].includes(q.aksi) && !admin) return { galat: "pin_salah" };
+    if (["hapus", "daftar", "gantiPin", "gantiPinTim", "biayaTambah", "biayaHapus", "waAtur", "waTes", "konfirmasi"].includes(q.aksi) && !admin) return { galat: "pin_salah" };
     const trip = baca("mj_coba_trip", []), biaya = baca("mj_coba_biaya", []);
     const muat = () => {
       const daftar = baca("mj_coba_daftar", DAFTAR_AWAL), rows = baca("mj_coba_trip", []);
-      if (admin) return { ok: true, akses: true, rows, biaya: baca("mj_coba_biaya", []), daftar, sheetUrl: "", langganan: lgc };
+      const w = baca("mj_coba_wa", { aktif: false, provider: "fonnte", tujuan: "", token: "" });
+      if (admin) return { ok: true, akses: true, rows, biaya: baca("mj_coba_biaya", []), daftar, sheetUrl: "", langganan: lgc,
+        wa: { aktif: w.aktif, provider: w.provider, tujuan: w.tujuan, adaToken: !!w.token } };
       return { ok: true, akses: false, daftar, langganan: lgc, rows: rows.map(r => { const o = { ...r }; ADMIN_SAJA.forEach(k => delete o[k]); return o; }) };
     };
     if (q.aksi === "muat") return muat();
+    if (q.aksi === "konfirmasi") {
+      const i = trip.findIndex(x => x.id === q.id);
+      if (i >= 0) { trip[i].status = "DIKONFIRMASI"; trip[i].dikonfirmasi = new Date().toISOString(); tulis("mj_coba_trip", trip); }
+      return muat();
+    }
+    if (q.aksi === "waAtur") {
+      const w = baca("mj_coba_wa", { aktif: false, provider: "fonnte", tujuan: "", token: "" });
+      Object.assign(w, { aktif: !!q.wa.aktif, provider: q.wa.provider || w.provider, tujuan: q.wa.tujuan ?? w.tujuan });
+      if (q.wa.token) w.token = q.wa.token; if (q.wa.hapusToken) w.token = "";
+      tulis("mj_coba_wa", w); return muat();
+    }
+    if (q.aksi === "waTes") return { ok: true, waKirim: waCoba(null, true, "✅ Tes notifikasi") };
+    let wa = null;
     if (q.aksi === "tambah") {
       let no = trip.reduce((m, r) => Math.max(m, r.no || 0), 0);
       const kenal = new Set(trip.map(r => r.id));
       q.rows.forEach(r => {
         if (!r || kenal.has(r.id)) return; kenal.add(r.id);
-        if (!admin) ADMIN_SAJA.forEach(k => r[k] = "");
-        r.no = ++no; r.dibuat = r.dibuat || new Date().toISOString(); r.diubah = ""; trip.push(r);
+        const impor = admin && String(r.id).startsWith("lama-");
+        if (!admin) ADMIN_TULIS.forEach(k => r[k] = "");
+        r.no = ++no; r.dibuat = r.dibuat || new Date().toISOString(); r.diubah = "";
+        if (!impor) { r.status = admin ? "DIKONFIRMASI" : "MENUNGGU"; r.dikonfirmasi = admin ? r.dibuat : ""; wa = waCoba(r, admin); r.waInfo = wa.ok ? "terkirim (simulasi)" : ""; }
+        trip.push(r);
       });
-      tulis("mj_coba_trip", trip); return muat();
+      tulis("mj_coba_trip", trip); return { ...muat(), waKirim: wa };
     }
     if (q.aksi === "ubah") {
       const i = trip.findIndex(x => x.id === q.row.id);
       if (i < 0) return { galat: "data tidak ditemukan" };
-      Object.keys(q.row).filter(k => !["id", "no", "dibuat", "diubah"].includes(k) && (admin || !ADMIN_SAJA.includes(k)))
+      Object.keys(q.row).filter(k => !["id", "no", "dibuat", "diubah"].includes(k) && (admin || !ADMIN_TULIS.includes(k)))
         .forEach(k => trip[i][k] = q.row[k]);
       trip[i].diubah = new Date().toISOString();
       tulis("mj_coba_trip", trip); return muat();
@@ -139,6 +167,9 @@ const API = (() => {
       if (MODE_COBA) { const j = devCoba(q); if (j.galat) { const e = new Error(j.galat); e.kode = j.galat; throw e; } return j; }
       return fetch(URL_API, { method: "POST", body: JSON.stringify(q) }).then(r => r.json()).then(j => { if (j.galat) { const e = new Error(j.galat); e.kode = j.galat; throw e; } return j; });
     },
+    konfirmasi: id => kirim({ aksi: "konfirmasi", id }),
+    waAtur: wa => kirim({ aksi: "waAtur", wa }),
+    waTes: () => kirim({ aksi: "waTes" }),
     hapusCache: () => { try { localStorage.removeItem("mj_cache"); } catch (_) {} },
   };
 })();

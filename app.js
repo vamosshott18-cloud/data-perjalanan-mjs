@@ -1,5 +1,5 @@
 // Data Perjalanan — CV. Muda Jaya Sembada. Layar: Catat (driver isi trip), Data (daftar per bulan), Rekap (admin).
-const VERSI = "6";
+const VERSI = "7";
 const $ = s => document.querySelector(s);
 const JENIS = ["Jenazah", "Pasien Kontrol", "Pasien Pulang", "Rujuk"];
 const SINGKAT = { "Jenazah": "JNZ", "Pasien Kontrol": "KTR", "Pasien Pulang": "PLG", "Rujuk": "RJK" };
@@ -8,7 +8,9 @@ const JENIS_BIAYA = ["Gaji", "Rujuk", "DLL", "Lainnya"];
 const BULAN = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
 const HARI = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
 
-const S = { rows: [], biaya: [], daftar: { driver: [], unit: [], tempat: [] }, akses: false, sheetUrl: "", langganan: null };
+const S = { rows: [], biaya: [], daftar: { driver: [], unit: [], tempat: [] }, akses: false, sheetUrl: "", langganan: null, wa: null };
+const menunggu = r => r.status === "MENUNGGU";
+let tripDariLink = new URLSearchParams(location.search).get("trip");
 const F = { tanggal: "", jenis: "", unit: "", bayar: "CASH", komplain: "TIDAK" };
 let langkah = 1, ubahId = null, bulanAktif = "", filterAktif = "semua", biayaJenis = "Gaji", balik = null;
 
@@ -67,8 +69,13 @@ function pakai(j) {
   S.rows = (j.rows || []).map(r => ({ ...r, nilai: Number(r.nilai) || 0, bbm: Number(r.bbm) || 0, tol: Number(r.tol) || 0, alat: Number(r.alat) || 0, lain: Number(r.lain) || 0 }));
   S.biaya = (j.biaya || []).map(b => ({ ...b, nilai: Number(b.nilai) || 0 }));
   S.daftar = j.daftar || S.daftar;
-  S.akses = !!j.akses; S.sheetUrl = j.sheetUrl || ""; S.langganan = j.langganan || S.langganan;
+  S.akses = !!j.akses; S.sheetUrl = j.sheetUrl || ""; S.langganan = j.langganan || S.langganan; S.wa = j.wa || (S.akses ? S.wa : null);
   gambarSemua(); gambarBanner();
+  if (tripDariLink && j.rows) {                                                   // dibuka dari link WA → langsung ke trip itu
+    const r = S.rows.find(x => x.id === tripDariLink); tripDariLink = null;
+    try { history.replaceState(null, "", location.pathname); } catch (_) {}
+    if (r) setTimeout(() => { bukaUbah(r); langkah = 5; gambarForm(); if (menunggu(r) && !S.akses) toast("Masuk dengan PIN admin untuk konfirmasi"); }, 50);
+  }
 }
 // ---------- langganan: habis → semua layar dikunci sampai developer memperpanjang ----------
 const tglIndo = s => { if (!s) return "-"; const [y, m, d] = s.split("-").map(Number); return `${d} ${BULAN[m - 1]} ${y}`; };
@@ -278,7 +285,12 @@ async function simpan() {
       row.id = idBaru(); row.dibuat = new Date().toISOString();
       const j = await API.tambah(row);
       if (j.antre) { toast("Tersimpan di HP — dikirim otomatis saat ada sinyal"); statusDariAntrean(); }
-      else { pakai(j); toast("Trip tersimpan ✓"); statusDariAntrean(true); }
+      else {
+        pakai(j); statusDariAntrean(true);
+        const w = j.waKirim;
+        toast(!w || w.mati ? (S.akses ? "Trip tersimpan ✓" : "Trip tersimpan ✓ · menunggu konfirmasi admin")
+          : w.ok ? "Trip tersimpan ✓ · WA ke admin terkirim" : "Trip tersimpan ✓ · WA gagal: " + w.pesan);
+      }
       balik = { jemput: row.jemput, antar: row.antar, jenis: row.jenis };
       const tgl = F.tanggal; kosongkanForm(); F.tanggal = tgl; langkah = 1; gambarForm(); window.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -294,6 +306,8 @@ function bukaUbah(r) {
   $("#judulUbah").textContent = `Mengubah trip #${r.no || "baru"} · ${tglPanjang(r.tanggal)}`;
   $("#cekUbah").hidden = !(S.akses && r.perluCek); $("#cekUbah").textContent = r.perluCek ? "⚠ Perlu dicek: " + r.perluCek : "";
   $("#btnSudahCek").hidden = !r.perluCek;
+  $("#btnKonfirmasi").hidden = !(menunggu(r) && S.akses);
+  if (menunggu(r)) $("#judulUbah").textContent += " · menunggu konfirmasi";
   if (r.driver && r.driver !== lsBaca("mj_driver", "")) $("#namaDriver").textContent = r.driver;
   langkah = 1; keLayar("lCatat"); gambarForm();
   if (r.driver) { $("#namaDriver").textContent = r.driver; }
@@ -310,6 +324,8 @@ function gambarData() {
     opsi.push(["cek", `Perlu cek (${semua.filter(r => r.perluCek).length})`]);
   }
   const driver = lsBaca("mj_driver", "");
+  const nTunggu = semua.filter(menunggu).length;
+  if (nTunggu) opsi.splice(1, 0, ["tunggu", `Menunggu konfirmasi (${nTunggu})`]);
   if (driver && !S.akses) opsi.push(["saya", `Trip saya (${semua.filter(r => r.driver === driver).length})`]);
   [...new Set([...JENIS, ...semua.map(r => r.jenis).filter(Boolean)])].forEach(j => { const n = semua.filter(r => r.jenis === j).length; if (n) opsi.push([j, `${j} (${n})`]); });
   if (semua.some(r => r.komplain === "YA")) opsi.push(["komplain", "Komplain"]);
@@ -320,7 +336,7 @@ function gambarData() {
   const q = $("#cari").value.trim().toLowerCase();
   let list = semua.filter(r =>
     filterAktif === "semua" ? true : filterAktif === "nilai" ? belumNilai(r) : filterAktif === "cek" ? !!r.perluCek :
-    filterAktif === "saya" ? r.driver === driver : filterAktif === "komplain" ? r.komplain === "YA" : r.jenis === filterAktif);
+    filterAktif === "saya" ? r.driver === driver : filterAktif === "tunggu" ? menunggu(r) : filterAktif === "komplain" ? r.komplain === "YA" : r.jenis === filterAktif);
   if (q) list = list.filter(r => [r.jemput, r.antar, r.unit, r.driver, r.catatan, r.ketKomplain, r.jenis, r.bayar].join(" ").toLowerCase().includes(q));
   const antre = API.antre().filter(r => (r.tanggal || "").startsWith(bulanAktif));
 
@@ -336,7 +352,7 @@ function gambarData() {
     const isi = grup[t].sort((a, b) => (b.no || 1e9) - (a.no || 1e9));
     const tot = S.akses ? isi.reduce((s, r) => s + (r.nilai || 0), 0) : 0;
     return `<div class="hari"><b>${tglPanjang(t)}</b><span>${isi.length} trip${S.akses && tot ? " · " + rp(tot) : ""}</span></div>` + isi.map(r => {
-      const tanda = (r.perluCek && S.akses ? `<span class="tanda cek">CEK</span>` : "") + (r.komplain === "YA" ? `<span class="tanda komplain">KOMPLAIN</span>` : "") + (r._antre ? `<span class="tanda cek">BELUM TERKIRIM</span>` : "");
+      const tanda = (menunggu(r) ? `<span class="tanda tunggu">MENUNGGU</span>` : "") + (r.perluCek && S.akses ? `<span class="tanda cek">CEK</span>` : "") + (r.komplain === "YA" ? `<span class="tanda komplain">KOMPLAIN</span>` : "") + (r._antre ? `<span class="tanda cek">BELUM TERKIRIM</span>` : "");
       const kanan = S.akses
         ? (belumNilai(r) ? `<span class="kosong-n">isi nilai</span>` : rp(r.nilai)) + `<small>${esc(r.bayar || "")}</small>`
         : (r.bbm ? `BBM ${jt(r.bbm)}` : "") + `<small>${esc(r.bayar || "")}</small>`;
@@ -438,9 +454,34 @@ function gambarAtur() {
     $("#dUnit").value = (S.daftar.unit || []).join("\n");
     $("#dTempat").value = (S.daftar.tempat || []).join("\n");
   }
+  gambarWa();
   $("#versi").textContent = `Versi ${VERSI}${API.MODE_COBA ? " · mode coba" : ""}`;
   if (S.akses && S.langganan?.sampai) $("#infoAkses").innerHTML += `<br>Langganan aktif sampai <b>${tglIndo(S.langganan.sampai)}</b> (${S.langganan.sisaHari} hari lagi).`;
 }
+// ---------- notifikasi WA (admin) ----------
+const waForm = { aktif: false, provider: "fonnte" };
+function gambarWa(dariServer = true) {
+  if (!S.akses) return;
+  if (dariServer && S.wa && !$("#lapisAtur").classList.contains("tampil")) {
+    waForm.aktif = !!S.wa.aktif; waForm.provider = S.wa.provider || "fonnte"; $("#waTujuan").value = S.wa.tujuan || ""; $("#waToken").value = "";
+  }
+  seg($("#waAktif"), ["MATI", "AKTIF"], waForm.aktif ? "AKTIF" : "MATI", v => { waForm.aktif = v === "AKTIF"; gambarWa(false); }, v => v === "AKTIF" ? "Aktif" : "Mati");
+  seg($("#waProvider"), ["fonnte", "callmebot"], waForm.provider, v => { waForm.provider = v; gambarWa(false); }, v => v === "fonnte" ? "Fonnte" : "CallMeBot");
+  const fonnte = waForm.provider === "fonnte";
+  $("#waTokenWrap").hidden = !fonnte;
+  $("#waToken").placeholder = S.wa?.adaToken ? "Token tersimpan — isi hanya kalau mau ganti" : "Tempel token dari fonnte.com";
+  $("#waTujuan").placeholder = fonnte ? "0812xxxxxxx" : "0812xxxxxxx:apikey";
+  $("#waBantu").innerHTML = fonnte
+    ? "Daftar di <b>fonnte.com</b>, sambungkan satu nomor WA pengirim (scan QR), salin <b>token</b>-nya ke sini. Bisa kirim ke nomor admin mana saja."
+    : "Gratis, tapi tiap nomor admin harus daftar sendiri: kirim pesan aktivasi ke bot CallMeBot dari HP admin, lalu tulis <b>nomor:apikey</b> yang didapat.";
+}
+async function simpanWa() {
+  try {
+    pakai(await API.waAtur({ aktif: waForm.aktif, provider: waForm.provider, tujuan: $("#waTujuan").value, token: $("#waToken").value.trim() }));
+    $("#waToken").value = ""; gambarWa(false); toast("Pengaturan WA tersimpan ✓");
+  } catch (e) { if (!cekKunci(e)) toast("Gagal: " + e.message); }
+}
+
 async function masukAdmin(pin) {
   if (!/^\d{4,8}$/.test(pin)) { toast("PIN berupa angka"); return; }
   API.pasangPin(pin);
@@ -504,6 +545,19 @@ function pasang() {
   $("#btnHapus").onclick = async () => {
     if (!confirm("Hapus trip ini? Tidak bisa dibatalkan.")) return;
     try { pakai(await API.hapus(ubahId)); toast("Trip dihapus"); kosongkanForm(); gambarForm(); keLayar("lData"); } catch (e) { toast("Gagal: " + e.message); }
+  };
+  $("#btnKonfirmasi").onclick = async () => {
+    try { pakai(await API.konfirmasi(ubahId)); toast("Booking dikonfirmasi ✓"); $("#btnKonfirmasi").hidden = true;
+      $("#judulUbah").textContent = $("#judulUbah").textContent.replace(" · menunggu konfirmasi", " · dikonfirmasi ✓"); }
+    catch (e) { if (!cekKunci(e)) toast("Gagal: " + e.message); }
+  };
+  $("#waSimpan").onclick = simpanWa;
+  $("#waTes").onclick = async () => {
+    $("#waHasil").textContent = "Mengirim tes…";
+    try { await API.waAtur({ aktif: waForm.aktif, provider: waForm.provider, tujuan: $("#waTujuan").value, token: $("#waToken").value.trim() });
+      const j = await API.waTes(), w = j.waKirim || {};
+      $("#waHasil").textContent = w.ok ? "✓ " + w.pesan : "✗ " + w.pesan; }
+    catch (e) { if (!cekKunci(e)) $("#waHasil").textContent = "Gagal: " + e.message; }
   };
   $("#btnSudahCek").onclick = async () => {
     try { pakai(await API.ubah({ id: ubahId, perluCek: "" })); toast("Ditandai sudah dicek ✓"); $("#cekUbah").hidden = true; $("#btnSudahCek").hidden = true; } catch (e) { toast("Gagal: " + e.message); }
