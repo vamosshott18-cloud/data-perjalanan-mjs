@@ -1,5 +1,5 @@
 // Data Perjalanan — CV. Muda Jaya Sembada. Layar: Catat (driver isi trip), Data (daftar per bulan), Rekap (admin).
-const VERSI = "2";
+const VERSI = "3";
 const $ = s => document.querySelector(s);
 const JENIS = ["Jenazah", "Pasien Kontrol", "Pasien Pulang", "Rujuk"];
 const SINGKAT = { "Jenazah": "JNZ", "Pasien Kontrol": "KTR", "Pasien Pulang": "PLG", "Rujuk": "RJK" };
@@ -29,7 +29,8 @@ const idBaru = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toStr
 const lsBaca = (k, d) => { try { return localStorage.getItem(k) ?? d; } catch (_) { return d; } };
 const lsTulis = (k, v) => { try { localStorage.setItem(k, v); } catch (_) {} };
 const belumNilai = r => !Number(r.nilai) && r.bayar !== "CSR";
-const kelasJenis = j => "j-" + String(j || "").replace(/\s+/g, "-");
+const kelasJenis = j => JENIS.includes(j) ? "j-" + j.replace(/\s+/g, "-") : "j-lain";
+const singkatJenis = j => SINGKAT[j] || String(j || "—").replace(/[^A-Za-z]/g, "").slice(0, 3).toUpperCase() || "—";
 
 let tTimer;
 function toast(t) { const el = $("#toast"); el.textContent = t; el.classList.add("tampil"); clearTimeout(tTimer); tTimer = setTimeout(() => el.classList.remove("tampil"), 2600); }
@@ -130,7 +131,9 @@ function gambarForm() {
   $("#tglTeks").textContent = t === h ? "Hari ini" : t === geser(h, -1) ? "Kemarin" : tglPanjang(t);
   $("#tglSub").textContent = t === h || t === geser(h, -1) ? tglPanjang(t) : "";
   $("#tglInput").value = t;
-  chips($("#jenisChips"), JENIS, F.jenis, v => { F.jenis = v; gambarForm(); if (lengkap(1)) setTimeout(() => keLangkah(2), 200); });
+  chips($("#jenisChips"), JENIS, F.jenis, v => { F.jenis = v; $("#jenisLain").value = ""; gambarForm(); if (lengkap(1)) setTimeout(() => keLangkah(2), 200); });
+  if (document.activeElement !== $("#jenisLain")) $("#jenisLain").value = F.jenis && !JENIS.includes(F.jenis) ? F.jenis : "";
+  $("#dlJenis").innerHTML = [...new Set(S.rows.map(r => r.jenis).filter(j => j && !JENIS.includes(j)))].map(v => `<option value="${esc(v)}">`).join("");
 
   chips($("#jemputChips"), sering("jemput"), $("#jemput").value, v => { $("#jemput").value = v; gambarForm(); if (lengkap(2)) setTimeout(() => keLangkah(3), 200); else $("#antar").focus(); }, "chip kecil");
   chips($("#antarChips"), sering("antar"), $("#antar").value, v => { $("#antar").value = v; gambarForm(); if (lengkap(2)) setTimeout(() => keLangkah(3), 200); }, "chip kecil");
@@ -173,7 +176,7 @@ function ringkas() {
       if (balik.jenis === "Pasien Kontrol") F.jenis = "Pasien Pulang";
       balik = null; gambarForm(); if (lengkap(1) && lengkap(2)) keLangkah(3);
     };
-  } else if (langkah < 5 && !lengkap(langkah)) el.innerHTML = ["", lsBaca("mj_driver", "") ? "Ketuk jenis trip — langsung lanjut ke rute" : "Pilih nama driver dulu",
+  } else if (langkah < 5 && !lengkap(langkah)) el.innerHTML = ["", lsBaca("mj_driver", "") ? "Ketuk jenis trip, atau ketik jenis lain lalu Lanjut" : "Pilih nama driver dulu",
       "Isi titik jemput & antar", "Pilih unit & pembayaran"][langkah];
   else if (langkah < 3) el.innerHTML = "";
   else if (kurang.length) el.innerHTML = `Belum diisi: <b>${kurang.join(", ")}</b>`;
@@ -236,7 +239,7 @@ function bacaForm() {
 }
 function kosongkanForm() {
   ubahId = null; F.jenis = ""; F.komplain = "TIDAK"; F.bayar = "CASH";
-  ["#jemput", "#antar", "#bbm", "#tol", "#alat", "#lain", "#nilai", "#ketKomplain", "#catatan"].forEach(id => $(id).value = "");
+  ["#jenisLain", "#jemput", "#antar", "#bbm", "#tol", "#alat", "#lain", "#nilai", "#ketKomplain", "#catatan"].forEach(id => $(id).value = "");
   F.unit = lsBaca("mj_unit", F.unit);
 }
 async function simpan() {
@@ -284,7 +287,7 @@ function gambarData() {
   }
   const driver = lsBaca("mj_driver", "");
   if (driver && !S.akses) opsi.push(["saya", `Trip saya (${semua.filter(r => r.driver === driver).length})`]);
-  JENIS.forEach(j => { const n = semua.filter(r => r.jenis === j).length; if (n) opsi.push([j, `${j} (${n})`]); });
+  [...new Set([...JENIS, ...semua.map(r => r.jenis).filter(Boolean)])].forEach(j => { const n = semua.filter(r => r.jenis === j).length; if (n) opsi.push([j, `${j} (${n})`]); });
   if (semua.some(r => r.komplain === "YA")) opsi.push(["komplain", "Komplain"]);
   if (!opsi.some(o => o[0] === filterAktif)) filterAktif = "semua";
   $("#filterData").innerHTML = opsi.map(([k, t]) => `<button class="chip kecil${k === filterAktif ? " pilih" : ""}" data-k="${esc(k)}">${esc(t)}</button>`).join("");
@@ -314,7 +317,7 @@ function gambarData() {
         ? (belumNilai(r) ? `<span class="kosong-n">isi nilai</span>` : rp(r.nilai)) + `<small>${esc(r.bayar || "")}</small>`
         : (r.bbm ? `BBM ${jt(r.bbm)}` : "") + `<small>${esc(r.bayar || "")}</small>`;
       return `<button class="item${r._antre ? " antre" : ""}" data-id="${esc(r.id)}">
-        <span class="jenis ${kelasJenis(r.jenis)}">${SINGKAT[r.jenis] || "—"}</span>
+        <span class="jenis ${kelasJenis(r.jenis)}">${esc(singkatJenis(r.jenis))}</span>
         <span class="tengah"><b>${esc(r.jemput)} → ${esc(r.antar)}</b><span>${esc(r.jenis)} · ${esc(r.unit)} · ${esc(r.driver)}${tanda}</span></span>
         <span class="kanan-i">${kanan}</span></button>`;
     }).join("");
@@ -446,6 +449,12 @@ function pasang() {
   $("#tglTambah").onclick = () => { F.tanggal = geser(F.tanggal, 1); gambarForm(); };
   $("#tglInput").onchange = e => { if (e.target.value) { F.tanggal = e.target.value; gambarForm(); } };
   $("#tukar").onclick = () => { const a = $("#jemput").value; $("#jemput").value = $("#antar").value; $("#antar").value = a; gambarForm(); };
+  $("#jenisLain").addEventListener("input", e => {
+    const v = e.target.value.trim(); F.jenis = v;
+    $("#jenisChips").querySelectorAll("button").forEach(b => b.classList.toggle("pilih", b.dataset.v === v));
+    ringkas();
+  });
+  $("#jenisLain").addEventListener("keydown", e => { if (e.key === "Enter" && lengkap(1)) { e.target.blur(); keLangkah(2); } });
   ["#jemput", "#antar"].forEach(id => { $(id).addEventListener("input", ringkas); $(id).addEventListener("change", gambarForm); });
   ["#nilai", "#bbm", "#tol", "#alat", "#lain", "#biayaNilai"].forEach(id => uangInput($(id)));
   $("#simpan").onclick = simpan;

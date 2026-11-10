@@ -123,6 +123,7 @@
   .j-Jenazah { background: #e9eaf3; color: var(--navy); }
   .j-Rujuk { background: var(--merah-muda); color: var(--merah); }
   .j-Pasien-Kontrol { background: #e6f4ec; color: #17794a; }
+  .item .jenis.j-lain { background: #eef0f4; color: #4a4e66; }
   .j-Pasien-Pulang { background: #fff4d6; color: #96690a; }
   .item .tengah { flex: 1; min-width: 0; }
   .item .tengah b { display: block; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -254,6 +255,9 @@
         <button class="panah" id="tglTambah" aria-label="Hari berikutnya">›</button>
       </div>
       <div id="jenisChips" class="grid-2" style="margin-top:10px"></div>
+      <div class="sub">Jenis lain <span class="opsional">— ketik manual kalau tidak ada di atas</span></div>
+      <input id="jenisLain" class="isian" list="dlJenis" placeholder="mis. Antar obat, Event standby…" autocomplete="off">
+      <datalist id="dlJenis"></datalist>
     </div>
 
     <div class="kartu langkah" data-l="2">
@@ -436,9 +440,9 @@
 
 <div id="toast" class="toast"></div>
 
-<script src="config.js?v=2"></script>
-<script src="api.js?v=2"></script>
-<script src="ekspor.js?v=2"></script>
-<script src="app.js?v=2"></script>
+<script src="config.js?v=3"></script>
+<script src="api.js?v=3"></script>
+<script src="ekspor.js?v=3"></script>
+<script src="app.js?v=3"></script>
 </body>
 </html>
