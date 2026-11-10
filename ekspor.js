@@ -88,7 +88,12 @@ const EKSPOR = (() => {
       body: urut(d).map((r, i) => [i + 1, tglx(r.tanggal), r.jenis, r.jemput, r.antar, r.unit, r.driver, r.bayar, r.nilai ? rpx(r.nilai) : "-", r.bbm ? rpx(r.bbm) : "", r.tol ? rpx(r.tol) : "", (r.alat || 0) + (r.lain || 0) ? rpx((r.alat || 0) + (r.lain || 0)) : ""]),
       columnStyles: { 8: { halign: "right" }, 9: { halign: "right" }, 10: { halign: "right" }, 11: { halign: "right" } } });
     const n = doc.getNumberOfPages();
-    for (let i = 1; i <= n; i++) { doc.setPage(i); doc.setFontSize(8); doc.setTextColor(150); doc.text(`Halaman ${i} dari ${n}`, W - 12, 290, { align: "right" }); }
+    for (let i = 1; i <= n; i++) {
+      doc.setPage(i); doc.setFontSize(8); doc.setTextColor(150);
+      doc.text(`Halaman ${i} dari ${n}`, W - 12, 290, { align: "right" });
+      doc.text("RAHASIA - hanya untuk internal CV. Muda Jaya Sembada. Dilarang disebarkan.", 12, 290);
+    }
+    doc.setProperties({ title: `Laporan Perjalanan ${d.judul}`, author: "CV. Muda Jaya Sembada", subject: "Rahasia - internal", creator: "Data Perjalanan MJS" });
     await simpan(doc.output("blob"), namaFile(d, "pdf"));
   }
 

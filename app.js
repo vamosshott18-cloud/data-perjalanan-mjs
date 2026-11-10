@@ -1,5 +1,5 @@
 // Data Perjalanan — CV. Muda Jaya Sembada. Layar: Catat (driver isi trip), Data (daftar per bulan), Rekap (admin).
-const VERSI = "5";
+const VERSI = "6";
 const $ = s => document.querySelector(s);
 const JENIS = ["Jenazah", "Pasien Kontrol", "Pasien Pulang", "Rujuk"];
 const SINGKAT = { "Jenazah": "JNZ", "Pasien Kontrol": "KTR", "Pasien Pulang": "PLG", "Rujuk": "RJK" };
@@ -463,8 +463,23 @@ async function impor(file) {
   } catch (e) { info.textContent = "Gagal impor: " + e.message; }
 }
 
+// ---------- anti-salin: blok salin/potong/klik kanan/seret di luar kolom isian ----------
+function pasangAntiSalin() {
+  const bolehDiSalin = t => t && t.closest && t.closest("input, textarea, select, [contenteditable]");
+  ["copy", "cut", "contextmenu", "dragstart", "selectstart"].forEach(ev => document.addEventListener(ev, e => {
+    if (bolehDiSalin(e.target)) return;
+    e.preventDefault();
+    if (ev === "copy" || ev === "cut") toast("Data aplikasi tidak bisa disalin");
+  }, true));
+  document.addEventListener("keydown", e => {                                        // Ctrl/Cmd + A, C, S, P, U di luar kolom isian
+    if (!(e.ctrlKey || e.metaKey) || bolehDiSalin(e.target)) return;
+    if (["a", "c", "s", "p", "u"].includes(e.key.toLowerCase())) { e.preventDefault(); if (e.key.toLowerCase() === "p") toast("Gunakan menu Ekspor (admin) untuk laporan"); }
+  }, true);
+}
+
 // ---------- pasang ----------
 function pasang() {
+  pasangAntiSalin();
   bulanAktif = hariIni().slice(0, 7);
   document.querySelectorAll("nav.bawah button").forEach(b => b.onclick = () => keLayar(b.dataset.layar));
   $("#btnMasuk").onclick = masuk;

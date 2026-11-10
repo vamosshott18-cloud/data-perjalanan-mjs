@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Data Perjalanan MJS</title>
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex, noai, noimageai">
+<meta name="googlebot" content="noindex, nofollow, noarchive, nosnippet">
+<meta name="referrer" content="no-referrer">
+<meta name="format-detection" content="telephone=no">
 <meta name="theme-color" content="#1b1e3d">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="ikon-192.png?v=1">
@@ -203,6 +207,11 @@
   .gembok { width: 64px; height: 64px; border-radius: 50%; background: var(--merah-muda); display: grid; place-items: center; margin: 0 auto 12px; }
   .gembok svg { width: 30px; height: 30px; stroke: var(--merah); }
   .banner-lg { background: var(--merah-muda); border: 1.5px solid #f6c3c0; color: #8f1015; border-radius: 10px; padding: 10px 12px; font-size: 13px; margin-bottom: 12px; }
+  /* anti-salin: teks data tidak bisa diblok/disalin, kecuali kolom isian */
+  body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  input, textarea, select, [contenteditable] { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
+  img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
+  @media print { body * { visibility: hidden !important; } body::after { content: "Dokumen ini tidak boleh dicetak dari aplikasi. Gunakan menu Ekspor (admin)."; visibility: visible; position: fixed; top: 40%; left: 0; right: 0; text-align: center; font: 16px sans-serif; } }
   @media (max-width: 360px) { .grid-4 { grid-template-columns: repeat(2, 1fr); } }
 </style>
 </head>
@@ -456,9 +465,9 @@
 
 <div id="toast" class="toast"></div>
 
-<script src="config.js?v=5"></script>
-<script src="api.js?v=5"></script>
-<script src="ekspor.js?v=5"></script>
-<script src="app.js?v=5"></script>
+<script src="config.js?v=6"></script>
+<script src="api.js?v=6"></script>
+<script src="ekspor.js?v=6"></script>
+<script src="app.js?v=6"></script>
 </body>
 </html>
