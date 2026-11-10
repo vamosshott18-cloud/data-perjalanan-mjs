@@ -200,6 +200,9 @@
   .rs-baris span { color: var(--redup); flex: none; }
   .rs-baris b { text-align: right; }
   .rs-baris button { border: 0; background: none; color: var(--merah); font-weight: 700; font-size: 12px; padding: 0 0 0 8px; }
+  .gembok { width: 64px; height: 64px; border-radius: 50%; background: var(--merah-muda); display: grid; place-items: center; margin: 0 auto 12px; }
+  .gembok svg { width: 30px; height: 30px; stroke: var(--merah); }
+  .banner-lg { background: var(--merah-muda); border: 1.5px solid #f6c3c0; color: #8f1015; border-radius: 10px; padding: 10px 12px; font-size: 13px; margin-bottom: 12px; }
   @media (max-width: 360px) { .grid-4 { grid-template-columns: repeat(2, 1fr); } }
 </style>
 </head>
@@ -216,6 +219,18 @@
   </div>
 </div>
 
+<div id="layarKunci" class="masuk" hidden>
+  <div class="kotak">
+    <img src="logo_lengkap.png" alt="CV. Muda Jaya Sembada">
+    <div class="gembok"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+    <h2>Aplikasi terkunci</h2>
+    <p id="kunciPesan">Masa langganan sudah berakhir.</p>
+    <p class="catatan-kecil" style="margin:-8px 0 18px">Data kamu tetap aman tersimpan. Aplikasi terbuka lagi setelah langganan diperpanjang oleh developer.</p>
+    <a id="kunciWa" class="tombol merah" style="display:block;text-decoration:none;margin-bottom:8px" target="_blank" rel="noopener" hidden>Hubungi developer (WhatsApp)</a>
+    <button id="kunciCek" class="tombol garis">Cek lagi</button>
+  </div>
+</div>
+
 <div id="aplikasi" hidden>
 <header>
   <div class="logo"><img src="logo.png" alt=""></div>
@@ -229,6 +244,7 @@
 </header>
 
 <main>
+  <div id="bannerLangganan"></div>
   <!-- ============ CATAT ============ -->
   <section id="lCatat" class="layar aktif">
     <div id="kartuUbah" class="kartu ubah-mode" hidden>
@@ -440,9 +456,9 @@
 
 <div id="toast" class="toast"></div>
 
-<script src="config.js?v=4"></script>
-<script src="api.js?v=4"></script>
-<script src="ekspor.js?v=4"></script>
-<script src="app.js?v=4"></script>
+<script src="config.js?v=5"></script>
+<script src="api.js?v=5"></script>
+<script src="ekspor.js?v=5"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>

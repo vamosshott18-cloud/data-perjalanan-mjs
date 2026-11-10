@@ -1,5 +1,5 @@
 // Data Perjalanan — CV. Muda Jaya Sembada. Layar: Catat (driver isi trip), Data (daftar per bulan), Rekap (admin).
-const VERSI = "4";
+const VERSI = "5";
 const $ = s => document.querySelector(s);
 const JENIS = ["Jenazah", "Pasien Kontrol", "Pasien Pulang", "Rujuk"];
 const SINGKAT = { "Jenazah": "JNZ", "Pasien Kontrol": "KTR", "Pasien Pulang": "PLG", "Rujuk": "RJK" };
@@ -8,7 +8,7 @@ const JENIS_BIAYA = ["Gaji", "Rujuk", "DLL", "Lainnya"];
 const BULAN = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
 const HARI = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
 
-const S = { rows: [], biaya: [], daftar: { driver: [], unit: [], tempat: [] }, akses: false, sheetUrl: "" };
+const S = { rows: [], biaya: [], daftar: { driver: [], unit: [], tempat: [] }, akses: false, sheetUrl: "", langganan: null };
 const F = { tanggal: "", jenis: "", unit: "", bayar: "CASH", komplain: "TIDAK" };
 let langkah = 1, ubahId = null, bulanAktif = "", filterAktif = "semua", biayaJenis = "Gaji", balik = null;
 
@@ -67,12 +67,35 @@ function pakai(j) {
   S.rows = (j.rows || []).map(r => ({ ...r, nilai: Number(r.nilai) || 0, bbm: Number(r.bbm) || 0, tol: Number(r.tol) || 0, alat: Number(r.alat) || 0, lain: Number(r.lain) || 0 }));
   S.biaya = (j.biaya || []).map(b => ({ ...b, nilai: Number(b.nilai) || 0 }));
   S.daftar = j.daftar || S.daftar;
-  S.akses = !!j.akses; S.sheetUrl = j.sheetUrl || "";
-  gambarSemua();
+  S.akses = !!j.akses; S.sheetUrl = j.sheetUrl || ""; S.langganan = j.langganan || S.langganan;
+  gambarSemua(); gambarBanner();
+}
+// ---------- langganan: habis → semua layar dikunci sampai developer memperpanjang ----------
+const tglIndo = s => { if (!s) return "-"; const [y, m, d] = s.split("-").map(Number); return `${d} ${BULAN[m - 1]} ${y}`; };
+function terkunci(data = {}) {
+  API.hapusCache(); S.rows = []; S.biaya = [];
+  lsTulis("mj_terkunci", JSON.stringify(data));
+  $("#aplikasi").hidden = true; $("#layarMasuk").hidden = true; $("#layarKunci").hidden = false;
+  $("#lapisAtur").classList.remove("tampil");
+  $("#kunciPesan").textContent = data.sampai ? `Masa langganan berakhir pada ${tglIndo(data.sampai)}.` : "Aplikasi belum diaktifkan oleh developer.";
+  const wa = String(data.kontak || "").replace(/^0/, "62");
+  $("#kunciWa").hidden = !wa;
+  if (wa) $("#kunciWa").href = `https://wa.me/${wa}?text=${encodeURIComponent("Halo, saya mau memperpanjang langganan aplikasi Data Perjalanan CV. Muda Jaya Sembada.")}`;
+}
+function bukaKunci() {
+  try { localStorage.removeItem("mj_terkunci"); } catch (_) {}
+  if (!$("#layarKunci").hidden) { $("#layarKunci").hidden = true; if (lsBaca("mj_pin_tim", "")) $("#aplikasi").hidden = false; else keLogin(); }
+}
+const cekKunci = e => { if (e && e.kode === "langganan_habis") { terkunci(e.data || {}); return true; } return false; };
+function gambarBanner() {
+  const lg = S.langganan, el = $("#bannerLangganan");
+  if (!lg || !lg.sampai || lg.sisaHari > 7 || (!S.akses && lg.sisaHari > 3)) { el.innerHTML = ""; return; }
+  el.innerHTML = `<div class="banner-lg">⏳ Langganan berakhir <b>${tglIndo(lg.sampai)}</b> (${lg.sisaHari === 0 ? "hari ini" : lg.sisaHari + " hari lagi"}). Setelah itu aplikasi terkunci — hubungi developer untuk memperpanjang.</div>`;
 }
 async function muat() {
-  try { const j = await API.muat(); pakai(j); statusDariAntrean(true); }
+  try { const j = await API.muat(); bukaKunci(); pakai(j); statusDariAntrean(true); }
   catch (e) {
+    if (cekKunci(e)) return;
     if (e.kode === "pin_tim") { keLogin("PIN tidak dikenal. Minta PIN baru ke admin."); return; }
     if (e.kode === "pin_salah") { API.lepasPin(); toast("PIN admin salah"); return muat(); }
     if (e.kode === "terkunci") toast("Terlalu banyak PIN salah. Coba lagi 15 menit lagi.");
@@ -93,8 +116,9 @@ async function masuk() {
   try {
     const j = await API.muat();
     $("#layarMasuk").hidden = true; $("#aplikasi").hidden = false;
-    pakai(j); statusDariAntrean(true);
+    bukaKunci(); pakai(j); statusDariAntrean(true);
   } catch (e) {
+    if (cekKunci(e)) { $("#btnMasuk").disabled = false; return; }
     API.keluar();
     $("#pesanMasuk").textContent = e.kode === "pin_tim" ? "PIN salah." : e.kode === "terkunci" ? "Terlalu banyak percobaan. Tunggu 15 menit." : "Tidak tersambung ke internet.";
   }
@@ -258,7 +282,7 @@ async function simpan() {
       balik = { jemput: row.jemput, antar: row.antar, jenis: row.jenis };
       const tgl = F.tanggal; kosongkanForm(); F.tanggal = tgl; langkah = 1; gambarForm(); window.scrollTo({ top: 0, behavior: "smooth" });
     }
-  } catch (e) { toast(e.kode === "pin_salah" ? "Butuh PIN admin" : "Gagal: " + e.message); }
+  } catch (e) { if (!cekKunci(e)) toast(e.kode === "pin_salah" ? "Butuh PIN admin" : "Gagal: " + e.message); }
   tombol.disabled = false; ringkas(); $("#simpan").textContent = ubahId ? "Simpan perubahan" : "Simpan trip";
 }
 function bukaUbah(r) {
@@ -415,12 +439,13 @@ function gambarAtur() {
     $("#dTempat").value = (S.daftar.tempat || []).join("\n");
   }
   $("#versi").textContent = `Versi ${VERSI}${API.MODE_COBA ? " · mode coba" : ""}`;
+  if (S.akses && S.langganan?.sampai) $("#infoAkses").innerHTML += `<br>Langganan aktif sampai <b>${tglIndo(S.langganan.sampai)}</b> (${S.langganan.sisaHari} hari lagi).`;
 }
 async function masukAdmin(pin) {
   if (!/^\d{4,8}$/.test(pin)) { toast("PIN berupa angka"); return; }
   API.pasangPin(pin);
   try { const j = await API.muat(); if (!j.akses) throw Object.assign(new Error("pin_salah"), { kode: "pin_salah" }); pakai(j); toast("Mode admin aktif"); statusDariAntrean(true); }
-  catch (e) { API.lepasPin(); toast(e.kode === "terkunci" ? "Terlalu banyak percobaan. Tunggu 15 menit." : "PIN admin salah"); muat(); }
+  catch (e) { if (cekKunci(e)) return; API.lepasPin(); toast(e.kode === "terkunci" ? "Terlalu banyak percobaan. Tunggu 15 menit." : "PIN admin salah"); muat(); }
 }
 async function impor(file) {
   const info = $("#infoImpor");
@@ -498,6 +523,14 @@ function pasang() {
   window.addEventListener("online", muat);
   document.addEventListener("visibilitychange", () => { if (!document.hidden && !$("#aplikasi").hidden) muat(); });
 
+  $("#kunciCek").onclick = async () => {
+    $("#kunciCek").disabled = true; $("#kunciCek").textContent = "Memeriksa…";
+    if (lsBaca("mj_pin_tim", "")) await muat();
+    else { try { await API.muat(); } catch (e) { if (!cekKunci(e)) { bukaKunci(); keLogin(); } } }
+    $("#kunciCek").disabled = false; $("#kunciCek").textContent = "Cek lagi";
+  };
+  const kunciLama = lsBaca("mj_terkunci", "");
+  if (kunciLama) { try { terkunci(JSON.parse(kunciLama)); } catch (_) { terkunci(); } $("#kunciCek").click(); return; }
   if (!lsBaca("mj_pin_tim", "")) { keLogin(); return; }
   $("#aplikasi").hidden = false;
   const c = API.simpanan(); if (c) pakai(c); else gambarSemua();

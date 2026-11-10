@@ -6,6 +6,14 @@
 //   PIN_TIM — semua driver: buka aplikasi, catat trip, lihat & ubah trip (tanpa nilai pembayaran).
 //   PIN     — admin: nilai pembayaran, biaya bulanan, rekap & ekspor, hapus, pengaturan, ganti PIN.
 // Tanpa PIN tim, server menolak semuanya. PIN salah 10× dalam 15 menit → semua cek PIN ditolak 15 menit.
+//
+// LANGGANAN (dikendalikan developer, bukan pembeli):
+//   AKTIF_SAMPAI — tanggal terakhir aplikasi boleh dipakai (yyyy-MM-dd, zona Asia/Jakarta). Lewat tanggal itu
+//                  server menolak SEMUA permintaan (termasuk PIN admin) dengan galat "langganan_habis".
+//   DEV_KUNCI    — kunci rahasia developer (beda dari PIN admin) untuk halaman developer.html:
+//                  lihat status, perpanjang, atur tanggal, kunci sekarang.
+//   KONTAK_DEV   — nomor WhatsApp developer yang ditampilkan di layar terkunci (opsional).
+// Developer juga bisa langsung dari editor ini: perpanjangSebulan(), kunciSekarang(), lihatLangganan().
 const KOLOM = ["id", "no", "tanggal", "jenis", "jemput", "antar", "unit", "driver", "bayar", "nilai", "bbm", "tol", "alat", "lain",
   "komplain", "ketKomplain", "catatan", "perluCek", "dibuat", "diubah"];
 const KOLOM_ADMIN_SAJA = ["nilai", "perluCek"];
@@ -39,6 +47,9 @@ function doPost(e) {
         cache.put("gagal", String(gagal + 1), GAGAL_DETIK);
         Utilities.sleep(1500);
       }
+      if (String(q.aksi || "").indexOf("dev") === 0) { out = layananDev(q, prop, cache, gagal); return kirimJson(out); }
+      const lg = langganan();
+      if (!lg.aktif) return kirimJson({ galat: "langganan_habis", sampai: lg.sampai, kontak: lg.kontak });
       const khususAdmin = ["hapus", "daftar", "gantiPin", "gantiPinTim", "biayaTambah", "biayaHapus"];
       if (!tim) out = { galat: "pin_tim" };
       else if (khususAdmin.indexOf(q.aksi) >= 0 && !admin) out = { galat: "pin_salah" };
@@ -55,7 +66,46 @@ function doPost(e) {
     }
   } catch (err) { out = { galat: String(err) }; }
   finally { try { kunci.releaseLock(); } catch (_) {} }
-  return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+  return kirimJson(out);
+}
+const kirimJson = o => ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
+
+// ---------- langganan ----------
+const hariIniWIB = () => Utilities.formatDate(new Date(), "Asia/Jakarta", "yyyy-MM-dd");
+function langganan() {
+  const p = PropertiesService.getScriptProperties();
+  const sampai = p.getProperty("AKTIF_SAMPAI") || "", kontak = p.getProperty("KONTAK_DEV") || "";
+  if (!sampai) return { aktif: false, sampai: "", sisaHari: 0, kontak: kontak };            // belum diaktifkan developer → terkunci
+  const sisa = Math.round((new Date(sampai + "T00:00:00Z") - new Date(hariIniWIB() + "T00:00:00Z")) / 86400000);
+  return { aktif: sisa >= 0, sampai: sampai, sisaHari: sisa, kontak: kontak };
+}
+function tambahBulan(tgl, n) {
+  const [y, m, d] = tgl.split("-").map(Number);
+  const akhir = new Date(Date.UTC(y, m - 1 + n + 1, 0)).getUTCDate();                     // jaga 31 Jan + 1 bulan = 28/29 Feb
+  return Utilities.formatDate(new Date(Date.UTC(y, m - 1 + n, Math.min(d, akhir))), "UTC", "yyyy-MM-dd");
+}
+function layananDev(q, prop, cache, gagal) {
+  const kunciDev = prop.getProperty("DEV_KUNCI");
+  if (gagal >= GAGAL_MAKS) return { galat: "terkunci" };
+  if (!kunciDev || String(q.devKunci || "") !== kunciDev) {
+    cache.put("gagal", String(gagal + 1), GAGAL_DETIK); Utilities.sleep(1500);
+    return { galat: "dev_salah" };
+  }
+  const lg = langganan(), hari = hariIniWIB();
+  if (q.aksi === "devPerpanjang") {
+    const n = Math.max(1, Math.min(24, Number(q.bulan) || 1));
+    const dasar = lg.aktif ? lg.sampai : hari;                                            // habis → hitung dari hari ini
+    prop.setProperty("AKTIF_SAMPAI", tambahBulan(dasar, n));
+  } else if (q.aksi === "devAtur") {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(q.sampai || ""))) return { galat: "tanggal harus yyyy-mm-dd" };
+    prop.setProperty("AKTIF_SAMPAI", q.sampai);
+  } else if (q.aksi === "devKunci") {
+    prop.setProperty("AKTIF_SAMPAI", Utilities.formatDate(new Date(Date.now() - 86400000), "Asia/Jakarta", "yyyy-MM-dd"));
+  } else if (q.aksi === "devKontak") {
+    prop.setProperty("KONTAK_DEV", String(q.kontak || "").replace(/[^0-9]/g, ""));
+  } else if (q.aksi !== "devStatus") return { galat: "aksi tidak dikenal" };
+  const t = lembar("Trip");
+  return { ok: true, langganan: langganan(), hariIni: hari, jumlahTrip: Math.max(0, t.getLastRow() - 1), sheetUrl: buku().getUrl() };
 }
 
 function buku() {
@@ -107,10 +157,11 @@ function baca(nama, kolom) {
 
 function muat(admin) {
   const trip = baca("Trip", KOLOM);
-  if (admin) return { ok: true, akses: true, rows: trip, biaya: baca("Biaya", KOLOM_BIAYA), daftar: bacaDaftar(), sheetUrl: buku().getUrl() };
+  const lg = langganan();
+  if (admin) return { ok: true, akses: true, rows: trip, biaya: baca("Biaya", KOLOM_BIAYA), daftar: bacaDaftar(), sheetUrl: buku().getUrl(), langganan: lg };
   // PIN tim: semua trip tanpa nilai pembayaran & catatan cek admin
   const rows = trip.map(r => { const o = {}; KOLOM.forEach(k => { if (KOLOM_ADMIN_SAJA.indexOf(k) < 0) o[k] = r[k]; }); return o; });
-  return { ok: true, akses: false, rows: rows, daftar: bacaDaftar() };
+  return { ok: true, akses: false, rows: rows, daftar: bacaDaftar(), langganan: { sampai: lg.sampai, sisaHari: lg.sisaHari, kontak: lg.kontak } };
 }
 
 function gantiPin(nama, baru) {
@@ -171,4 +222,21 @@ function buatPinAwal() {
   if (!p.getProperty("PIN")) p.setProperty("PIN", acak());
   while (!p.getProperty("PIN_TIM") || p.getProperty("PIN_TIM") === p.getProperty("PIN")) p.setProperty("PIN_TIM", acak());
   Logger.log("PIN admin: " + p.getProperty("PIN") + " | PIN tim: " + p.getProperty("PIN_TIM"));
+}
+
+// ---------- alat developer (jalankan dari editor; hasil di log) ----------
+function buatKunciDev() {
+  const p = PropertiesService.getScriptProperties();
+  if (!p.getProperty("DEV_KUNCI")) p.setProperty("DEV_KUNCI", Utilities.getUuid().replace(/-/g, "").slice(0, 20));
+  Logger.log("Kunci developer: " + p.getProperty("DEV_KUNCI"));
+}
+function lihatLangganan() { Logger.log(JSON.stringify(langganan())); }
+function perpanjangSebulan() {
+  const lg = langganan(), p = PropertiesService.getScriptProperties();
+  p.setProperty("AKTIF_SAMPAI", tambahBulan(lg.aktif ? lg.sampai : hariIniWIB(), 1));
+  lihatLangganan();
+}
+function kunciSekarang() {
+  PropertiesService.getScriptProperties().setProperty("AKTIF_SAMPAI", Utilities.formatDate(new Date(Date.now() - 86400000), "Asia/Jakarta", "yyyy-MM-dd"));
+  lihatLangganan();
 }

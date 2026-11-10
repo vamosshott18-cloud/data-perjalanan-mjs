@@ -14,7 +14,27 @@ const API = (() => {
   const salin = o => JSON.parse(JSON.stringify(o));
 
   // ---- mode coba: meniru server (PIN tim coba 111111, PIN admin coba 123456), semua di localStorage ----
+  // langganan coba: tanggal di mj_coba_sampai (default 1 bulan dari hari ini), kunci developer coba "dev-coba"
+  const hariIni = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+  function langgananCoba() {
+    let sampai = baca("mj_coba_sampai", null);
+    if (!sampai) { const d = new Date(); d.setMonth(d.getMonth() + 1); sampai = d.toISOString().slice(0, 10); tulis("mj_coba_sampai", sampai); }
+    const sisa = Math.round((new Date(sampai) - new Date(hariIni())) / 86400000);
+    return { aktif: sisa >= 0, sampai, sisaHari: sisa, kontak: baca("mj_coba_kontak", "") };
+  }
+  function devCoba(q) {
+    if (q.devKunci !== "dev-coba") return { galat: "dev_salah" };
+    const lg = langgananCoba(), d = new Date(lg.aktif ? lg.sampai : hariIni());
+    if (q.aksi === "devPerpanjang") { d.setMonth(d.getMonth() + (Number(q.bulan) || 1)); tulis("mj_coba_sampai", d.toISOString().slice(0, 10)); }
+    if (q.aksi === "devAtur") tulis("mj_coba_sampai", q.sampai);
+    if (q.aksi === "devKunci") { const k = new Date(hariIni()); k.setDate(k.getDate() - 1); tulis("mj_coba_sampai", k.toISOString().slice(0, 10)); }
+    if (q.aksi === "devKontak") tulis("mj_coba_kontak", String(q.kontak || "").replace(/[^0-9]/g, ""));
+    return { ok: true, langganan: langgananCoba(), hariIni: hariIni(), jumlahTrip: baca("mj_coba_trip", []).length, sheetUrl: "" };
+  }
   function layananCoba(q) {
+    if (String(q.aksi).startsWith("dev")) return devCoba(q);
+    const lgc = langgananCoba();
+    if (!lgc.aktif) return { galat: "langganan_habis", sampai: lgc.sampai, kontak: lgc.kontak };
     const pinAdmin = baca("mj_coba_pin", "123456"), pinTim = baca("mj_coba_pin_tim", "111111");
     const admin = q.pin === pinAdmin, tim = admin || q.pinTim === pinTim || q.pinTim === pinAdmin;
     if (!tim) return { galat: "pin_tim" };
@@ -22,8 +42,8 @@ const API = (() => {
     const trip = baca("mj_coba_trip", []), biaya = baca("mj_coba_biaya", []);
     const muat = () => {
       const daftar = baca("mj_coba_daftar", DAFTAR_AWAL), rows = baca("mj_coba_trip", []);
-      if (admin) return { ok: true, akses: true, rows, biaya: baca("mj_coba_biaya", []), daftar, sheetUrl: "" };
-      return { ok: true, akses: false, daftar, rows: rows.map(r => { const o = { ...r }; ADMIN_SAJA.forEach(k => delete o[k]); return o; }) };
+      if (admin) return { ok: true, akses: true, rows, biaya: baca("mj_coba_biaya", []), daftar, sheetUrl: "", langganan: lgc };
+      return { ok: true, akses: false, daftar, langganan: lgc, rows: rows.map(r => { const o = { ...r }; ADMIN_SAJA.forEach(k => delete o[k]); return o; }) };
     };
     if (q.aksi === "muat") return muat();
     if (q.aksi === "tambah") {
@@ -69,12 +89,12 @@ const API = (() => {
       const r = await fetch(URL_API, { method: "POST", body: JSON.stringify(isi) });   // tanpa header → tidak perlu preflight CORS
       j = await r.json();
     }
-    if (j.galat) { const e = new Error(j.galat); e.kode = j.galat; throw e; }
+    if (j.galat) { const e = new Error(j.galat); e.kode = j.galat; e.data = j; throw e; }
     if (j.rows) simpanCache(j);
     return j;
   }
   function simpanCache(j) {
-    tulis("mj_cache", { rows: j.rows, biaya: j.biaya || [], daftar: j.daftar, akses: !!j.akses, sheetUrl: j.sheetUrl || "", waktu: Date.now() });
+    tulis("mj_cache", { rows: j.rows, biaya: j.biaya || [], daftar: j.daftar, akses: !!j.akses, sheetUrl: j.sheetUrl || "", langganan: j.langganan || null, waktu: Date.now() });
   }
 
   const antre = () => baca("mj_antre", []);
@@ -114,5 +134,11 @@ const API = (() => {
     lepasPin: () => { try { localStorage.removeItem("mj_pin"); localStorage.removeItem("mj_cache"); } catch (_) {} },
     keluar: () => { try { ["mj_pin_tim", "mj_pin", "mj_cache"].forEach(k => localStorage.removeItem(k)); } catch (_) {} },
     kirimAntrean,
+    dev: async (aksi, devKunci, isi = {}) => {
+      const q = { aksi, devKunci, ...isi };
+      if (MODE_COBA) { const j = devCoba(q); if (j.galat) { const e = new Error(j.galat); e.kode = j.galat; throw e; } return j; }
+      return fetch(URL_API, { method: "POST", body: JSON.stringify(q) }).then(r => r.json()).then(j => { if (j.galat) { const e = new Error(j.galat); e.kode = j.galat; throw e; } return j; });
+    },
+    hapusCache: () => { try { localStorage.removeItem("mj_cache"); } catch (_) {} },
   };
 })();
