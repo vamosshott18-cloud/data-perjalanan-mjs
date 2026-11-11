@@ -32,6 +32,7 @@ const EKSPOR = (() => {
   const gambar = src => new Promise(ok => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = src; });
   const barisHitung = d => [
     ["Pemasukan (" + d.trip + " trip)", rpx(d.pemasukan)],
+    ["Hak driver", "-" + rpx(d.hak)], ["Fee informan", "-" + rpx(d.fee)],
     ["BBM", "-" + rpx(d.bbm)], ["Tol", "-" + rpx(d.tol)], ["Alat medis", "-" + rpx(d.alat)], ["Pengeluaran lain", "-" + rpx(d.lain)],
     ...d.biaya.map(x => [`${x.jenis}${x.ket && x.ket !== x.jenis ? " - " + x.ket : ""}`, "-" + rpx(x.nilai)]),
     ["SISA", rpx(d.sisa)],
@@ -84,9 +85,9 @@ const EKSPOR = (() => {
     doc.addPage();
     judul(`Rincian trip — ${d.judul}`, 16);
     doc.autoTable({ ...gaya, startY: 19, styles: { ...gaya.styles, fontSize: 7.5 },
-      head: [["No", "Tanggal", "Jenis", "Jemput", "Antar", "Unit", "Driver", "Bayar", "Nilai", "BBM", "Tol", "Lain"]],
-      body: urut(d).map((r, i) => [i + 1, tglx(r.tanggal), r.jenis, r.jemput, r.antar, r.unit, r.driver, r.bayar, r.nilai ? rpx(r.nilai) : "-", r.bbm ? rpx(r.bbm) : "", r.tol ? rpx(r.tol) : "", (r.alat || 0) + (r.lain || 0) ? rpx((r.alat || 0) + (r.lain || 0)) : ""]),
-      columnStyles: { 8: { halign: "right" }, 9: { halign: "right" }, 10: { halign: "right" }, 11: { halign: "right" } } });
+      head: [["No", "Tanggal", "Jenis", "Jemput", "Antar", "Unit", "Driver", "Bayar", "Nilai", "Hak drv", "Fee", "BBM", "Tol", "Lain"]],
+      body: urut(d).map((r, i) => [i + 1, tglx(r.tanggal), r.jenis, r.jemput, r.antar, r.unit, r.driver, r.bayar, r.nilai ? rpx(r.nilai) : "-", r.hakDriver ? rpx(r.hakDriver) : "", r.fee ? rpx(r.fee) : "", r.bbm ? rpx(r.bbm) : "", r.tol ? rpx(r.tol) : "", (r.alat || 0) + (r.lain || 0) ? rpx((r.alat || 0) + (r.lain || 0)) : ""]),
+      columnStyles: { 8: { halign: "right" }, 9: { halign: "right" }, 10: { halign: "right" }, 11: { halign: "right" }, 12: { halign: "right" }, 13: { halign: "right" } } });
     const n = doc.getNumberOfPages();
     for (let i = 1; i <= n; i++) {
       doc.setPage(i); doc.setFontSize(8); doc.setTextColor(150);
@@ -102,17 +103,17 @@ const EKSPOR = (() => {
     toast("Membuat Excel…");
     await muatPustaka("xlsx");
     const wb = XLSX.utils.book_new();
-    const kolom = ["No", "Tanggal", "Jenis", "Titik jemput", "Titik antar", "Unit", "Driver", "Pembayaran", "Nilai", "BBM", "Tol", "Alat medis", "Pengeluaran lain", "Komplain", "Ket. komplain", "Catatan", "Perlu cek"];
-    const isi = urut(d).map((r, i) => [i + 1, tglx(r.tanggal), r.jenis, r.jemput, r.antar, r.unit, r.driver, r.bayar, r.nilai || 0, r.bbm || 0, r.tol || 0, r.alat || 0, r.lain || 0, r.komplain, r.ketKomplain || "", r.catatan || "", r.perluCek || ""]);
+    const kolom = ["No", "Tanggal", "Jenis", "Titik jemput", "Titik antar", "Unit", "Driver", "Pembayaran", "Nilai order", "Hak driver", "Fee informan", "BBM", "Tol", "Alat medis", "Pengeluaran lain", "Komplain", "Ket. komplain", "Catatan", "Perlu cek"];
+    const isi = urut(d).map((r, i) => [i + 1, tglx(r.tanggal), r.jenis, r.jemput, r.antar, r.unit, r.driver, r.bayar, r.nilai || 0, r.hakDriver || 0, r.fee || 0, r.bbm || 0, r.tol || 0, r.alat || 0, r.lain || 0, r.komplain, r.ketKomplain || "", r.catatan || "", r.perluCek || ""]);
     const n = isi.length + 1;
     const ws = XLSX.utils.aoa_to_sheet([kolom, ...isi]);
-    if (isi.length) XLSX.utils.sheet_add_aoa(ws, [["", "TOTAL", "", "", "", "", "", "", { f: `SUM(I2:I${n})` }, { f: `SUM(J2:J${n})` }, { f: `SUM(K2:K${n})` }, { f: `SUM(L2:L${n})` }, { f: `SUM(M2:M${n})` }]], { origin: n });
-    ws["!autofilter"] = { ref: `A1:Q${n}` };
-    ws["!cols"] = [5, 11, 14, 26, 26, 10, 10, 11, 12, 11, 11, 11, 12, 9, 22, 30, 30].map(w => ({ wch: w }));
-    for (let r = 2; r <= n + 1; r++) ["I", "J", "K", "L", "M"].forEach(c => { if (ws[c + r]) ws[c + r].z = "#,##0"; });
+    if (isi.length) XLSX.utils.sheet_add_aoa(ws, [["", "TOTAL", "", "", "", "", "", "", { f: `SUM(I2:I${n})` }, { f: `SUM(J2:J${n})` }, { f: `SUM(K2:K${n})` }, { f: `SUM(L2:L${n})` }, { f: `SUM(M2:M${n})` }, { f: `SUM(N2:N${n})` }, { f: `SUM(O2:O${n})` }]], { origin: n });
+    ws["!autofilter"] = { ref: `A1:S${n}` };
+    ws["!cols"] = [5, 11, 14, 26, 26, 10, 10, 11, 12, 12, 12, 11, 11, 11, 12, 9, 22, 30, 30].map(w => ({ wch: w }));
+    for (let r = 2; r <= n + 1; r++) ["I", "J", "K", "L", "M", "N", "O"].forEach(c => { if (ws[c + r]) ws[c + r].z = "#,##0"; });
     XLSX.utils.book_append_sheet(wb, ws, "Rincian");
     const rek = XLSX.utils.aoa_to_sheet([["Laporan Data Perjalanan — CV. Muda Jaya Sembada"], [d.judul], [], ["Uraian", "Nilai"],
-      [`Pemasukan (${d.trip} trip)`, d.pemasukan], ["BBM", -d.bbm], ["Tol", -d.tol], ["Alat medis", -d.alat], ["Pengeluaran lain", -d.lain],
+      [`Pemasukan (${d.trip} trip)`, d.pemasukan], ["Hak driver", -d.hak], ["Fee informan", -d.fee], ["BBM", -d.bbm], ["Tol", -d.tol], ["Alat medis", -d.alat], ["Pengeluaran lain", -d.lain],
       ...d.biaya.map(x => [`${x.jenis}${x.ket && x.ket !== x.jenis ? " - " + x.ket : ""}`, -x.nilai]), ["SISA", d.sisa], [],
       ["Jenis", "Trip", "Pemasukan"], ...d.perJenis.map(x => [x.nama, x.trip, x.nilai]), [],
       ["Pembayaran", "Trip", "Pemasukan"], ...d.perBayar.map(x => [x.nama, x.trip, x.nilai]), [],
@@ -128,7 +129,7 @@ const EKSPOR = (() => {
   async function wa(d) {
     const t = [`*Laporan Perjalanan — ${d.judul}*`, `CV. Muda Jaya Sembada`, ``,
       `Trip: ${d.trip}`, ...d.perJenis.map(x => `• ${x.nama}: ${x.trip}`), ``,
-      `Pemasukan: ${rpx(d.pemasukan)}`, `BBM: -${rpx(d.bbm)}`, `Tol: -${rpx(d.tol)}`,
+      `Pemasukan: ${rpx(d.pemasukan)}`, `Hak driver: -${rpx(d.hak)}`, ...(d.fee ? [`Fee informan: -${rpx(d.fee)}`] : []), `BBM: -${rpx(d.bbm)}`, `Tol: -${rpx(d.tol)}`,
       ...(d.alat ? [`Alat medis: -${rpx(d.alat)}`] : []), ...(d.lain ? [`Lain-lain: -${rpx(d.lain)}`] : []),
       ...d.biaya.map(x => `${x.ket || x.jenis}: -${rpx(x.nilai)}`), `*Sisa: ${rpx(d.sisa)}*`,
       ...(d.tanpaNilai ? [``, `_${d.tanpaNilai} trip belum ada nilai pembayaran_`] : [])].join("\n");

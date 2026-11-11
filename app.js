@@ -1,5 +1,5 @@
 // Data Perjalanan — CV. Muda Jaya Sembada. Layar: Catat (driver isi trip), Data (daftar per bulan), Rekap (admin).
-const VERSI = "7";
+const VERSI = "8";
 const $ = s => document.querySelector(s);
 const JENIS = ["Jenazah", "Pasien Kontrol", "Pasien Pulang", "Rujuk"];
 const SINGKAT = { "Jenazah": "JNZ", "Pasien Kontrol": "KTR", "Pasien Pulang": "PLG", "Rujuk": "RJK" };
@@ -8,7 +8,7 @@ const JENIS_BIAYA = ["Gaji", "Rujuk", "DLL", "Lainnya"];
 const BULAN = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
 const HARI = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
 
-const S = { rows: [], biaya: [], daftar: { driver: [], unit: [], tempat: [] }, akses: false, sheetUrl: "", langganan: null, wa: null };
+const S = { rows: [], biaya: [], daftar: { driver: [], unit: [], tempat: [] }, akses: false, sheetUrl: "", langganan: null, wa: null, persen: 20 };
 const menunggu = r => r.status === "MENUNGGU";
 let tripDariLink = new URLSearchParams(location.search).get("trip");
 const F = { tanggal: "", jenis: "", unit: "", bayar: "CASH", komplain: "TIDAK" };
@@ -69,7 +69,7 @@ function pakai(j) {
   S.rows = (j.rows || []).map(r => ({ ...r, nilai: Number(r.nilai) || 0, bbm: Number(r.bbm) || 0, tol: Number(r.tol) || 0, alat: Number(r.alat) || 0, lain: Number(r.lain) || 0 }));
   S.biaya = (j.biaya || []).map(b => ({ ...b, nilai: Number(b.nilai) || 0 }));
   S.daftar = j.daftar || S.daftar;
-  S.akses = !!j.akses; S.sheetUrl = j.sheetUrl || ""; S.langganan = j.langganan || S.langganan; S.wa = j.wa || (S.akses ? S.wa : null);
+  S.akses = !!j.akses; S.sheetUrl = j.sheetUrl || ""; S.langganan = j.langganan || S.langganan; S.wa = j.wa || (S.akses ? S.wa : null); S.persen = Number(j.persenDriver) || S.persen || 20;
   gambarSemua(); gambarBanner();
   if (tripDariLink && j.rows) {                                                   // dibuka dari link WA → langsung ke trip itu
     const r = S.rows.find(x => x.id === tripDariLink); tripDariLink = null;
@@ -178,13 +178,15 @@ function gambarForm() {
   seg($("#komplainChips"), ["TIDAK", "YA"], F.komplain, v => { F.komplain = v; gambarForm(); }, v => v === "YA" ? "Ada komplain" : "Tidak ada komplain");
   $("#ketKomplain").hidden = F.komplain !== "YA";
 
-  $("#nilaiWrap").hidden = !S.akses;
-  if (S.akses) {
+  {
     const antar = $("#antar").value.trim().toLowerCase();
     const lalu = antar && S.rows.filter(r => r.id !== ubahId && r.nilai && (r.antar || "").toLowerCase() === antar).sort((a, b) => (b.tanggal > a.tanggal ? 1 : -1))[0];
     const saran = [...new Set([lalu?.nilai, 150000, 200000, 1450000].filter(Boolean))];
     $("#nilaiCepat").innerHTML = saran.map(n => `<button type="button" class="chip kecil" data-n="${n}">${n === lalu?.nilai ? "Terakhir ke sini: " : ""}${rp(n)}</button>`).join("");
-    $("#nilaiCepat").querySelectorAll("button").forEach(b => b.onclick = () => { isiUang("#nilai", b.dataset.n); ringkas(); });
+    $("#nilaiCepat").querySelectorAll("button").forEach(b => b.onclick = () => { if (!$("#nilai").readOnly) { isiUang("#nilai", b.dataset.n); ringkas(); } });
+    const kunciNilai = !!ubahId && !S.akses;                                       // nilai trip yang sudah tersimpan hanya diubah admin
+    $("#nilai").readOnly = kunciNilai; $("#nilaiCepat").hidden = kunciNilai;
+    $("#persenTeks").textContent = S.persen;
   }
   $("#bbmCepat").innerHTML = [50000, 100000, 200000, 300000].map(n => `<button type="button" class="chip kecil" data-n="${n}">${jt(n)}</button>`).join("");
   $("#bbmCepat").querySelectorAll("button").forEach(b => b.onclick = () => { isiUang("#bbm", b.dataset.n); ringkas(); });
@@ -195,9 +197,17 @@ function gambarForm() {
   ringkas();
   gambarLangkah();
 }
+const hakDari = nilai => Math.round((Number(nilai) || 0) * S.persen / 100);
+function perbaruiHak() {
+  const n = nilaiUang("#nilai"), hak = hakDari(n);
+  $("#hakDriver").textContent = rp(hak);
+  $("#hakKet").textContent = n ? `Otomatis: ${S.persen}% × ${rp(n)} = ${rp(hak)}` : `Hak driver otomatis ${S.persen}% dari nilai order.`;
+  if ($("#nilai").readOnly) $("#hakKet").textContent += " · Nilai order hanya bisa diubah admin.";
+}
 function ringkas() {
   const j = $("#jemput").value.trim(), a = $("#antar").value.trim();
-  const biaya = ["#bbm", "#tol", "#alat", "#lain"].reduce((s, id) => s + nilaiUang(id), 0);
+  perbaruiHak();
+  const biaya = ["#fee", "#bbm", "#tol", "#alat", "#lain"].reduce((s, id) => s + nilaiUang(id), 0);
   const kurang = [!lsBaca("mj_driver", "") && "driver", !F.jenis && "jenis", !j && "titik jemput", !a && "titik antar"].filter(Boolean);
   const el = $("#ringkas");
   if (balik && !ubahId && !j && !a) {
@@ -215,7 +225,7 @@ function ringkas() {
   $("#simpan").disabled = kurang.length > 0;
   const btnLanjut = $("#lanjut");
   btnLanjut.disabled = !lengkap(langkah);
-  btnLanjut.textContent = langkah === 4 && !biaya ? "Tidak ada biaya ›" : "Lanjut ›";
+  btnLanjut.textContent = langkah === 4 && !biaya && !nilaiUang("#nilai") ? "Tidak ada biaya ›" : "Lanjut ›";
   if (langkah === 5) gambarRingkasan();
 }
 // ---------- langkah 1–5: selesaikan satu langkah dulu, baru pindah ----------
@@ -255,7 +265,9 @@ function gambarRingkasan() {
   $("#ringkasan5").innerHTML = `<p class="label">Cek sebelum simpan</p>` +
     baris("Driver", esc(r.driver), 1) + baris("Tanggal", tglPanjang(r.tanggal), 1) + baris("Jenis", esc(r.jenis), 1) +
     baris("Rute", `${esc(r.jemput)} → ${esc(r.antar)}`, 2) + baris("Unit", `${esc(r.unit)} · ${esc(r.bayar)}`, 3) +
-    (S.akses ? baris("Nilai", nilaiUang("#nilai") ? rp(nilaiUang("#nilai")) : "belum diisi", 3) : "") +
+    baris("Nilai order", r.nilai ? rp(r.nilai) : "belum diisi", 4) +
+    baris("Fee informan", r.fee ? rp(r.fee) : "tidak ada", 4) +
+    baris(`Hak driver (${S.persen}%)`, rp(hakDari(r.nilai)), 4) +
     baris("Biaya jalan", biaya.length ? biaya.map(([t, n]) => `${t} ${rp(n)}`).join(" · ") : "tidak ada", 4);
   $("#ringkasan5").querySelectorAll("button").forEach(b => b.onclick = () => keLangkah(Number(b.dataset.n)));
 }
@@ -264,18 +276,18 @@ function bacaForm() {
   return {
     tanggal: F.tanggal, jenis: F.jenis, jemput: $("#jemput").value.trim(), antar: $("#antar").value.trim(),
     unit: F.unit, driver: lsBaca("mj_driver", ""), bayar: F.bayar,
+    nilai: nilaiUang("#nilai"), fee: nilaiUang("#fee"),
     bbm: nilaiUang("#bbm"), tol: nilaiUang("#tol"), alat: nilaiUang("#alat"), lain: nilaiUang("#lain"),
     komplain: F.komplain, ketKomplain: F.komplain === "YA" ? $("#ketKomplain").value.trim() : "", catatan: $("#catatan").value.trim(),
   };
 }
 function kosongkanForm() {
   ubahId = null; F.jenis = ""; F.komplain = "TIDAK"; F.bayar = "CASH";
-  ["#jenisLain", "#jemput", "#antar", "#bbm", "#tol", "#alat", "#lain", "#nilai", "#ketKomplain", "#catatan"].forEach(id => $(id).value = "");
+  ["#jenisLain", "#jemput", "#antar", "#fee", "#bbm", "#tol", "#alat", "#lain", "#nilai", "#ketKomplain", "#catatan"].forEach(id => $(id).value = "");
   F.unit = lsBaca("mj_unit", F.unit);
 }
 async function simpan() {
   const row = bacaForm();
-  if (S.akses) row.nilai = nilaiUang("#nilai");
   const tombol = $("#simpan"); tombol.disabled = true; tombol.textContent = "Menyimpan…";
   try {
     if (ubahId) {
@@ -301,7 +313,7 @@ function bukaUbah(r) {
   ubahId = r.id; balik = null;
   F.tanggal = r.tanggal || hariIni(); F.jenis = r.jenis; F.unit = r.unit; F.bayar = r.bayar || "CASH"; F.komplain = r.komplain === "YA" ? "YA" : "TIDAK";
   $("#jemput").value = r.jemput || ""; $("#antar").value = r.antar || "";
-  isiUang("#bbm", r.bbm); isiUang("#tol", r.tol); isiUang("#alat", r.alat); isiUang("#lain", r.lain); isiUang("#nilai", r.nilai);
+  isiUang("#bbm", r.bbm); isiUang("#tol", r.tol); isiUang("#alat", r.alat); isiUang("#lain", r.lain); isiUang("#nilai", r.nilai); isiUang("#fee", r.fee);
   $("#ketKomplain").value = r.ketKomplain || ""; $("#catatan").value = r.catatan || "";
   $("#judulUbah").textContent = `Mengubah trip #${r.no || "baru"} · ${tglPanjang(r.tanggal)}`;
   $("#cekUbah").hidden = !(S.akses && r.perluCek); $("#cekUbah").textContent = r.perluCek ? "⚠ Perlu dicek: " + r.perluCek : "";
@@ -355,7 +367,7 @@ function gambarData() {
       const tanda = (menunggu(r) ? `<span class="tanda tunggu">MENUNGGU</span>` : "") + (r.perluCek && S.akses ? `<span class="tanda cek">CEK</span>` : "") + (r.komplain === "YA" ? `<span class="tanda komplain">KOMPLAIN</span>` : "") + (r._antre ? `<span class="tanda cek">BELUM TERKIRIM</span>` : "");
       const kanan = S.akses
         ? (belumNilai(r) ? `<span class="kosong-n">isi nilai</span>` : rp(r.nilai)) + `<small>${esc(r.bayar || "")}</small>`
-        : (r.bbm ? `BBM ${jt(r.bbm)}` : "") + `<small>${esc(r.bayar || "")}</small>`;
+        : (r.nilai ? rp(r.nilai) : r.bbm ? `BBM ${jt(r.bbm)}` : "") + `<small>${esc(r.bayar || "")}</small>`;
       return `<button class="item${r._antre ? " antre" : ""}" data-id="${esc(r.id)}">
         <span class="jenis ${kelasJenis(r.jenis)}">${esc(singkatJenis(r.jenis))}</span>
         <span class="tengah"><b>${esc(r.jemput)} → ${esc(r.antar)}</b><span>${esc(r.jenis)} · ${esc(r.unit)} · ${esc(r.driver)}${tanda}</span></span>
@@ -372,9 +384,9 @@ function gambarData() {
 function hitung(b) {
   const rows = diBulan(b), biaya = S.biaya.filter(x => x.bulan === b);
   const jum = k => rows.reduce((s, r) => s + (Number(r[k]) || 0), 0);
-  const h = { bulan: b, judul: namaBulan(b), rows, biaya, trip: rows.length, pemasukan: jum("nilai"), bbm: jum("bbm"), tol: jum("tol"), alat: jum("alat"), lain: jum("lain"),
+  const h = { bulan: b, judul: namaBulan(b), rows, biaya, trip: rows.length, pemasukan: jum("nilai"), bbm: jum("bbm"), tol: jum("tol"), alat: jum("alat"), lain: jum("lain"), fee: jum("fee"), hak: jum("hakDriver"),
     biayaBulan: biaya.reduce((s, x) => s + x.nilai, 0), tanpaNilai: rows.filter(belumNilai).length, perluCek: rows.filter(r => r.perluCek).length };
-  h.biayaTrip = h.bbm + h.tol + h.alat + h.lain;
+  h.biayaTrip = h.hak + h.fee + h.bbm + h.tol + h.alat + h.lain;
   h.keluar = h.biayaTrip + h.biayaBulan;
   h.sisa = h.pemasukan - h.keluar;
   const per = k => { const o = {}; rows.forEach(r => { const v = r[k] || "—"; o[v] ||= { nama: v, trip: 0, nilai: 0, bbm: 0 }; o[v].trip++; o[v].nilai += r.nilai || 0; o[v].bbm += r.bbm || 0; }); return Object.values(o).sort((a, c) => c.nilai - a.nilai || c.trip - a.trip); };
@@ -398,6 +410,8 @@ function gambarRekap() {
   const baris = (t, n, kelas = "") => `<tr class="${kelas}"><td>${t}</td><td class="n">${n}</td></tr>`;
   $("#tabelHitung").innerHTML =
     baris(`<b>Pemasukan</b> <span class="catatan-kecil">(${h.trip} trip)</span>`, `<b>${rp(h.pemasukan)}</b>`) +
+    `<tr class="grup"><td colspan="2">Dari nilai order</td></tr>` +
+    [[`Hak driver (${S.persen}%)`, h.hak], ["Fee informan", h.fee]].map(([t, n]) => baris(t, n ? "−" + rp(n) : "–", n ? "min" : "")).join("") +
     `<tr class="grup"><td colspan="2">Biaya jalan</td></tr>` +
     [["BBM", h.bbm], ["Tol", h.tol], ["Alat medis", h.alat], ["Pengeluaran lain", h.lain]].map(([t, n]) => baris(t, n ? "−" + rp(n) : "–", n ? "min" : "")).join("") +
     `<tr class="grup"><td colspan="2">Biaya bulanan</td></tr>` +
@@ -455,6 +469,7 @@ function gambarAtur() {
     $("#dTempat").value = (S.daftar.tempat || []).join("\n");
   }
   gambarWa();
+  if (document.activeElement !== $("#persenInput")) $("#persenInput").value = S.persen;
   $("#versi").textContent = `Versi ${VERSI}${API.MODE_COBA ? " · mode coba" : ""}`;
   if (S.akses && S.langganan?.sampai) $("#infoAkses").innerHTML += `<br>Langganan aktif sampai <b>${tglIndo(S.langganan.sampai)}</b> (${S.langganan.sisaHari} hari lagi).`;
 }
@@ -537,7 +552,11 @@ function pasang() {
   });
   $("#jenisLain").addEventListener("keydown", e => { if (e.key === "Enter" && lengkap(1)) { e.target.blur(); keLangkah(2); } });
   ["#jemput", "#antar"].forEach(id => { $(id).addEventListener("input", ringkas); $(id).addEventListener("change", gambarForm); });
-  ["#nilai", "#bbm", "#tol", "#alat", "#lain", "#biayaNilai"].forEach(id => uangInput($(id)));
+  ["#nilai", "#fee", "#bbm", "#tol", "#alat", "#lain", "#biayaNilai"].forEach(id => uangInput($(id)));
+  $("#btnPersen").onclick = async () => {
+    const v = Number(String($("#persenInput").value).replace(",", "."));
+    try { pakai(await API.aturPersen(v)); toast(`Hak driver jadi ${S.persen}% ✓`); } catch (e) { if (!cekKunci(e)) toast(e.message); }
+  };
   $("#simpan").onclick = simpan;
   $("#lanjut").onclick = () => keLangkah(langkah + 1);
   $("#kembali").onclick = () => keLangkah(langkah - 1);

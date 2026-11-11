@@ -8,8 +8,10 @@ const API = (() => {
     unit: ["APV", "Grandmax", "Innova", "Mobil Jenazah"],
     tempat: ["RS Awal Bros", "RS Awal Bros Yasmin", "RSUD", "RS Awal Bros Panam Pekanbaru", "RS Awal Bros Sudirman Pekanbaru", "Bumi Ayu"],
   };
-  const ADMIN_SAJA = ["nilai", "perluCek", "waInfo"];                          // disembunyikan dari driver
-  const ADMIN_TULIS = ["nilai", "perluCek", "waInfo", "status", "dikonfirmasi"]; // hanya admin yang boleh mengubah
+  const ADMIN_SAJA = ["perluCek", "waInfo"];                          // disembunyikan dari driver
+  const ADMIN_TULIS = ["nilai", "perluCek", "waInfo", "status", "dikonfirmasi", "hakDriver"];
+  const persenCoba = () => baca("mj_coba_persen", 20);
+  const hakCoba = n => Math.round((Number(n) || 0) * persenCoba() / 100); // hanya admin yang boleh mengubah
   const baca = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (_) { return d; } };
   const tulis = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} };
   const salin = o => JSON.parse(JSON.stringify(o));
@@ -48,14 +50,14 @@ const API = (() => {
     const pinAdmin = baca("mj_coba_pin", "123456"), pinTim = baca("mj_coba_pin_tim", "111111");
     const admin = q.pin === pinAdmin, tim = admin || q.pinTim === pinTim || q.pinTim === pinAdmin;
     if (!tim) return { galat: "pin_tim" };
-    if (["hapus", "daftar", "gantiPin", "gantiPinTim", "biayaTambah", "biayaHapus", "waAtur", "waTes", "konfirmasi"].includes(q.aksi) && !admin) return { galat: "pin_salah" };
+    if (["hapus", "daftar", "gantiPin", "gantiPinTim", "biayaTambah", "biayaHapus", "waAtur", "waTes", "konfirmasi", "aturPersen"].includes(q.aksi) && !admin) return { galat: "pin_salah" };
     const trip = baca("mj_coba_trip", []), biaya = baca("mj_coba_biaya", []);
     const muat = () => {
       const daftar = baca("mj_coba_daftar", DAFTAR_AWAL), rows = baca("mj_coba_trip", []);
       const w = baca("mj_coba_wa", { aktif: false, provider: "fonnte", tujuan: "", token: "" });
-      if (admin) return { ok: true, akses: true, rows, biaya: baca("mj_coba_biaya", []), daftar, sheetUrl: "", langganan: lgc,
+      if (admin) return { ok: true, akses: true, rows, biaya: baca("mj_coba_biaya", []), daftar, sheetUrl: "", langganan: lgc, persenDriver: persenCoba(),
         wa: { aktif: w.aktif, provider: w.provider, tujuan: w.tujuan, adaToken: !!w.token } };
-      return { ok: true, akses: false, daftar, langganan: lgc, rows: rows.map(r => { const o = { ...r }; ADMIN_SAJA.forEach(k => delete o[k]); return o; }) };
+      return { ok: true, akses: false, daftar, langganan: lgc, persenDriver: persenCoba(), rows: rows.map(r => { const o = { ...r }; ADMIN_SAJA.forEach(k => delete o[k]); return o; }) };
     };
     if (q.aksi === "muat") return muat();
     if (q.aksi === "konfirmasi") {
@@ -69,6 +71,7 @@ const API = (() => {
       if (q.wa.token) w.token = q.wa.token; if (q.wa.hapusToken) w.token = "";
       tulis("mj_coba_wa", w); return muat();
     }
+    if (q.aksi === "aturPersen") { const v = Number(q.persen); if (!(v > 0 && v <= 100)) return { galat: "persen harus 1–100" }; tulis("mj_coba_persen", v); return muat(); }
     if (q.aksi === "waTes") return { ok: true, waKirim: waCoba(null, true, "✅ Tes notifikasi") };
     let wa = null;
     if (q.aksi === "tambah") {
@@ -77,7 +80,8 @@ const API = (() => {
       q.rows.forEach(r => {
         if (!r || kenal.has(r.id)) return; kenal.add(r.id);
         const impor = admin && String(r.id).startsWith("lama-");
-        if (!admin) ADMIN_TULIS.forEach(k => r[k] = "");
+        if (!admin) ADMIN_TULIS.filter(k => k !== "nilai").forEach(k => r[k] = "");
+        if (!impor) r.hakDriver = hakCoba(r.nilai);
         r.no = ++no; r.dibuat = r.dibuat || new Date().toISOString(); r.diubah = "";
         if (!impor) { r.status = admin ? "DIKONFIRMASI" : "MENUNGGU"; r.dikonfirmasi = admin ? r.dibuat : ""; wa = waCoba(r, admin); r.waInfo = wa.ok ? "terkirim (simulasi)" : ""; }
         trip.push(r);
@@ -89,6 +93,7 @@ const API = (() => {
       if (i < 0) return { galat: "data tidak ditemukan" };
       Object.keys(q.row).filter(k => !["id", "no", "dibuat", "diubah"].includes(k) && (admin || !ADMIN_TULIS.includes(k)))
         .forEach(k => trip[i][k] = q.row[k]);
+      if (!String(trip[i].id).startsWith("lama-")) trip[i].hakDriver = hakCoba(trip[i].nilai);
       trip[i].diubah = new Date().toISOString();
       tulis("mj_coba_trip", trip); return muat();
     }
@@ -170,6 +175,7 @@ const API = (() => {
     konfirmasi: id => kirim({ aksi: "konfirmasi", id }),
     waAtur: wa => kirim({ aksi: "waAtur", wa }),
     waTes: () => kirim({ aksi: "waTes" }),
+    aturPersen: persen => kirim({ aksi: "aturPersen", persen }),
     hapusCache: () => { try { localStorage.removeItem("mj_cache"); } catch (_) {} },
   };
 })();

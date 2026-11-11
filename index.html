@@ -71,6 +71,8 @@
   .uang { position: relative; }
   .uang span { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--redup); font-size: 14px; pointer-events: none; }
   .uang input { padding-left: 36px; font-weight: 700; }
+  .lbl { display: block; font-size: 12px; font-weight: 700; color: var(--redup); margin-bottom: 4px; }
+  .isian.hitung { min-height: 46px; padding: 10px 12px; border: 1.5px solid var(--navy-muda); border-radius: 10px; display: flex; align-items: center; background: var(--navy-muda); border-color: var(--navy-muda); font-weight: 700; color: var(--navy); }
   .uang label { display: block; font-size: 12px; font-weight: 700; color: var(--redup); margin-bottom: 4px; position: static; }
 
   .rute { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; }
@@ -305,15 +307,19 @@
       <div id="unitChips" class="chips"></div>
       <div class="sub">Pembayaran</div>
       <div id="bayarChips" class="seg"></div>
-      <div id="nilaiWrap" hidden>
-        <div class="sub">Nilai pembayaran <span class="opsional">(admin)</span></div>
-        <div class="uang"><span>Rp</span><input id="nilai" class="isian" inputmode="numeric" placeholder="0" autocomplete="off"></div>
-        <div id="nilaiCepat" class="chips" style="margin-top:8px"></div>
-      </div>
     </div>
 
     <div class="kartu langkah" data-l="4">
-      <p class="label"><span class="no">4</span>Biaya jalan <span class="opsional">— kosongkan kalau tidak ada</span></p>
+      <p class="label"><span class="no">4</span>Biaya</p>
+      <div class="sub">Nilai order</div>
+      <div class="uang"><span>Rp</span><input id="nilai" class="isian" inputmode="numeric" placeholder="0" autocomplete="off"></div>
+      <div id="nilaiCepat" class="chips" style="margin-top:8px"></div>
+      <div class="grid-2" style="margin-top:12px">
+        <div class="uang"><label for="fee">Fee informan</label><div class="uang"><span>Rp</span><input id="fee" class="isian" inputmode="numeric" placeholder="0" autocomplete="off"></div></div>
+        <div><label class="lbl">Hak driver (<b id="persenTeks">20</b>%)</label><div id="hakDriver" class="isian hitung">Rp0</div></div>
+      </div>
+      <p class="catatan-kecil" id="hakKet" style="margin-top:6px">Hak driver dihitung otomatis dari nilai order.</p>
+      <div class="sub" style="margin-top:16px;padding-top:12px;border-top:1px solid var(--garis)">Biaya jalan <span class="opsional">— kosongkan kalau tidak ada</span></div>
       <div class="sub">BBM</div>
       <div class="uang"><span>Rp</span><input id="bbm" class="isian" inputmode="numeric" placeholder="0" autocomplete="off"></div>
       <div id="bbmCepat" class="chips" style="margin-top:8px"></div>
@@ -443,6 +449,11 @@
         <button id="simpanDaftar" class="tombol garis kecil" style="width:100%;margin-top:8px">Simpan daftar</button>
       </div>
       <div class="kartu">
+        <p class="label">Hak driver</p>
+        <div class="baris"><input id="persenInput" class="isian" inputmode="decimal" placeholder="20"><span style="font-weight:700">% dari nilai order</span><button id="btnPersen" class="tombol garis kecil">Simpan</button></div>
+        <p class="catatan-kecil">Berlaku untuk trip baru dan trip yang diubah. Trip lama (impor sheet lama) tidak dihitung ulang.</p>
+      </div>
+      <div class="kartu">
         <p class="label">Notifikasi WhatsApp booking baru</p>
         <p class="catatan-kecil" style="margin:0 0 10px">Setiap trip baru (dari driver atau admin) otomatis dikirim ke nomor admin di bawah, berisi detail booking + link untuk konfirmasi.</p>
         <div id="waAktif" class="seg" style="margin-bottom:10px"></div>
@@ -483,9 +494,9 @@
 
 <div id="toast" class="toast"></div>
 
-<script src="config.js?v=7"></script>
-<script src="api.js?v=7"></script>
-<script src="ekspor.js?v=7"></script>
-<script src="app.js?v=7"></script>
+<script src="config.js?v=8"></script>
+<script src="api.js?v=8"></script>
+<script src="ekspor.js?v=8"></script>
+<script src="app.js?v=8"></script>
 </body>
 </html>
